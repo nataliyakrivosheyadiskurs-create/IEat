@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>КБЖУ чек</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --paper: #FAFAF7;
+    --paper-shadow: #EAEAE3;
+    --ink: #1A1A1A;
+    --ink-soft: #6B6B63;
+    --rule: #D8D8D2;
+    --rule-strong: #B8B8B0;
+    --stamp: #5C2A4D;
+    --stamp-bg: rgba(92, 42, 77, 0.06);
+    --sage: #4A7C59;
+    --sage-bg: rgba(74, 124, 89, 0.08);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #E4E2DA;
+    font-family: 'Inter', sans-serif;
+    color: var(--ink);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 24px 12px;
+  }
+
+  /* ---------- Auth screen ---------- */
+  .auth-wrap {
+    width: 100%;
+    max-width: 360px;
+    background: var(--paper);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.04), 0 12px 32px rgba(0,0,0,0.08);
+    padding: 36px 28px;
+    margin-top: 60px;
+  }
+  .auth-wrap .store-name { text-align: center; margin-bottom: 4px; }
+  .auth-wrap .store-sub { text-align: center; margin-bottom: 28px; }
+  .auth-field {
+    margin-bottom: 14px;
+  }
+  .auth-field label {
+    display: block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--ink-soft);
+    margin-bottom: 5px;
+  }
+  .auth-field input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--rule-strong);
+    border-radius: 4px;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    background: #fff;
+  }
+  .auth-field input:focus { outline: none; border-color: var(--stamp); }
+  .auth-btn {
+    width: 100%;
+    background: var(--ink);
+    color: var(--paper);
+    border: none;
+    border-radius: 4px;
+    padding: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    margin-top: 6px;
+  }
+  .auth-btn:disabled { opacity: 0.5; cursor: default; }
+  .auth-btn:not(:disabled):hover { background: #333; }
+  .auth-toggle {
+    text-align: center;
+    margin-top: 16px;
+    font-size: 12.5px;
+    color: var(--ink-soft);
+  }
+  .auth-toggle a { color: var(--stamp); cursor: pointer; text-decoration: underline; }
+  .auth-error {
+    background: rgba(176,58,46,0.08);
+    color: #B03A2E;
+    font-size: 12.5px;
+    padding: 8px 10px;
+    border-radius: 4px;
+    margin-bottom: 14px;
+    display: none;
+  }
+  .auth-info {
+    background: var(--sage-bg);
+    color: var(--sage);
+    font-size: 12px;
+    padding: 8px 10px;
+    border-radius: 4px;
+    margin-bottom: 14px;
+    display: none;
+    line-height: 1.5;
+  }
+
+  /* ---------- App shell ---------- */
+  .receipt {
+    width: 100%;
+    max-width: 420px;
+    background: var(--paper);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.04), 0 12px 32px rgba(0,0,0,0.08);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-height: 640px;
+  }
+  .receipt::before, .receipt::after {
+    content: '';
+    position: absolute;
+    left: 0; right: 0;
+    height: 10px;
+    background-image: radial-gradient(circle at 8px 5px, #E4E2DA 5px, transparent 5.5px);
+    background-size: 16px 10px;
+    background-repeat: repeat-x;
+  }
+  .receipt::before { top: -1px; }
+  .receipt::after { bottom: -1px; transform: rotate(180deg); }
+
+  .header {
+    padding: 20px 22px 16px;
+    text-align: center;
+    border-bottom: 1px dashed var(--rule-strong);
+    position: relative;
+  }
+  .menu-btn {
+    position: absolute;
+    left: 18px;
+    top: 18px;
+    background: none;
+    border: 1px solid var(--rule-strong);
+    border-radius: 6px;
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
+    cursor: pointer;
+    color: var(--ink);
+  }
+  .logout-btn {
+    position: absolute;
+    right: 18px;
+    top: 18px;
+    background: none;
+    border: none;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    cursor: pointer;
+    letter-spacing: 0.5px;
+  }
+  .logout-btn:hover { color: var(--stamp); }
+  .store-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: 20px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  .store-sub {
+    font-size: 11px;
+    color: var(--ink-soft);
+    margin-top: 4px;
+    letter-spacing: 0.5px;
+  }
+
+  .day-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 18px 10px;
+  }
+  .day-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .week-strip {
+    display: flex;
+    justify-content: space-between;
+    gap: 4px;
+    padding: 0 12px 14px;
+    border-bottom: 1px dashed var(--rule);
+  }
+  .week-day {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 7px 2px;
+    border-radius: 8px;
+    cursor: pointer;
+    background: none;
+    border: 1px solid transparent;
+    font-family: 'Inter', sans-serif;
+  }
+  .week-day .wd-abbr { font-size: 9.5px; text-transform: uppercase; color: var(--ink-soft); letter-spacing: 0.5px; }
+  .week-day .wd-num { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 600; }
+  .week-day .wd-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--sage); margin-top: 1px; visibility: hidden; }
+  .week-day.has-data .wd-dot { visibility: visible; }
+  .week-day.today { border-color: var(--rule-strong); border-style: dashed; }
+  .week-day.selected { background: var(--stamp); border-color: var(--stamp); }
+  .week-day.selected .wd-abbr, .week-day.selected .wd-num { color: var(--paper); }
+  .week-day.selected .wd-dot { background: var(--paper); }
+
+  .totals-bar { position: relative; display: flex; justify-content: space-between; padding: 12px 18px; background: var(--paper-shadow); font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+  .totals-bar .tot-item { text-align: center; flex: 1; cursor: default; }
+  .totals-bar .tot-item.kcal-item { cursor: pointer; }
+  .totals-bar .tot-label { color: var(--ink-soft); font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .totals-bar .tot-value { font-weight: 700; font-size: 14px; margin-top: 2px; }
+
+  .kcal-progress-wrap { padding: 0 18px 12px; background: var(--paper-shadow); }
+  .kcal-progress-track { height: 6px; border-radius: 3px; background: rgba(0,0,0,0.08); overflow: hidden; position: relative; }
+  .kcal-progress-fill { height: 100%; border-radius: 3px; transition: width 0.3s ease, background 0.3s ease; }
+  .kcal-progress-fill.blue { background: #3B6FA8; }
+  .kcal-progress-fill.yellow { background: #C9A227; }
+  .kcal-progress-fill.green { background: var(--sage); }
+  .kcal-progress-fill.red { background: #B03A2E; }
+  .kcal-progress-meta { display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ink-soft); margin-top: 4px; }
+
+  .log { flex: 1; overflow-y: auto; padding: 16px 18px 8px; display: flex; flex-direction: column; gap: 2px; }
+  .empty-state { text-align: center; color: var(--ink-soft); font-size: 13px; margin-top: 40px; line-height: 1.6; }
+
+  .meal-group { margin-bottom: 14px; }
+  .meal-heading {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase;
+    letter-spacing: 1.5px; color: var(--ink-soft); margin-bottom: 6px; display: flex; align-items: center; gap: 8px;
+  }
+  .meal-heading::after { content: ''; flex: 1; border-bottom: 1px dotted var(--rule-strong); }
+
+  .line-item { display: flex; justify-content: space-between; align-items: baseline; padding: 3px 0; font-size: 13.5px; }
+  .line-item .name { flex: 1; padding-right: 8px; }
+  .line-item .macro { font-family: 'JetBrains Mono', monospace; color: var(--ink-soft); font-size: 11px; white-space: nowrap; }
+  .line-item .kcal { font-family: 'JetBrains Mono', monospace; font-weight: 600; white-space: nowrap; padding-left: 10px; }
+  .line-item.activity .kcal { color: var(--sage); }
+  .line-item.activity .name::before { content: '↳ '; color: var(--sage); }
+
+  .item-actions { display: flex; gap: 2px; padding-left: 8px; flex-shrink: 0; }
+  .item-actions button { background: none; border: none; font-size: 11px; color: var(--rule-strong); cursor: pointer; padding: 2px 3px; line-height: 1; }
+  .item-actions button:hover { color: var(--stamp); }
+  .item-actions .del-btn:hover { color: #A33; }
+
+  .meal-subtotal {
+    display: flex; justify-content: flex-end; gap: 6px; font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; color: var(--ink-soft); border-top: 1px solid var(--rule); margin-top: 4px; padding-top: 3px;
+  }
+
+  .stamp-wrap { margin: 14px 0; display: flex; justify-content: center; }
+  .stamp {
+    border: 2.5px solid var(--stamp); border-radius: 50%; color: var(--stamp); background: var(--stamp-bg);
+    width: 100%; max-width: 340px; padding: 16px 20px; text-align: center; transform: rotate(-2deg); position: relative;
+  }
+  .stamp-title { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 6px; }
+  .stamp-text { font-size: 12.5px; line-height: 1.5; color: var(--ink); font-family: 'Inter', sans-serif; }
+
+  .input-bar { border-top: 1px dashed var(--rule-strong); padding: 14px 16px; display: flex; gap: 8px; background: var(--paper); }
+  .input-bar textarea {
+    flex: 1; resize: none; border: 1px solid var(--rule-strong); border-radius: 4px; padding: 10px 12px;
+    font-family: 'Inter', sans-serif; font-size: 13.5px; line-height: 1.4; background: #fff; color: var(--ink);
+    min-height: 40px; max-height: 90px;
+  }
+  .input-bar textarea:focus { outline: none; border-color: var(--stamp); }
+  .input-bar button {
+    background: var(--ink); color: var(--paper); border: none; border-radius: 4px; padding: 0 18px;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.5px; cursor: pointer; flex-shrink: 0;
+  }
+  .input-bar button:disabled { opacity: 0.4; cursor: default; }
+  .input-bar button:not(:disabled):hover { background: #333; }
+
+  .comment-btn-row { padding: 0 18px 12px; text-align: center; }
+  .comment-btn {
+    background: none; border: 1px dashed var(--stamp); color: var(--stamp); font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: 1px; padding: 6px 14px; border-radius: 20px; cursor: pointer;
+  }
+  .comment-btn:hover { background: var(--stamp-bg); }
+  .comment-btn:disabled { opacity: 0.5; cursor: default; }
+
+  .log::-webkit-scrollbar { width: 6px; }
+  .log::-webkit-scrollbar-thumb { background: var(--rule-strong); border-radius: 3px; }
+
+  /* ---------- Side menu (settings/analytics placeholder) ---------- */
+  .side-menu-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.35); display: none; z-index: 50;
+  }
+  .side-menu-overlay.open { display: block; }
+  .side-menu {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 280px; background: var(--paper);
+    box-shadow: 4px 0 24px rgba(0,0,0,0.15); transform: translateX(-100%); transition: transform 0.25s ease; z-index: 51;
+    padding: 24px 20px; overflow-y: auto;
+  }
+  .side-menu.open { transform: translateX(0); }
+  .side-menu h3 {
+    font-family: 'JetBrains Mono', monospace; font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px;
+    color: var(--ink-soft); margin: 20px 0 8px;
+  }
+  .side-menu h3:first-child { margin-top: 0; }
+  .side-menu-item {
+    display: block; padding: 10px 8px; border-radius: 6px; font-size: 14px; color: var(--ink);
+    text-decoration: none; cursor: pointer; border: 1px solid var(--rule);
+    margin-bottom: 6px;
+  }
+  .side-menu-item.disabled { color: var(--ink-soft); cursor: default; opacity: 0.6; }
+  .side-menu-close {
+    background: none; border: none; font-size: 18px; cursor: pointer; float: right; color: var(--ink-soft);
+  }
+
+  /* ---------- Desktop layout ---------- */
+  @media (min-width: 860px) {
+    body { align-items: center; }
+    .receipt { max-width: 460px; min-height: 720px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- AUTH SCREEN -->
+<div class="auth-wrap" id="authScreen">
+  <div class="store-name">КБЖУ ЧЕК</div>
+  <div class="store-sub">дневник питания и активности</div>
+  <div class="auth-error" id="authError"></div>
+  <div class="auth-info" id="authInfo"></div>
+  <div class="auth-field">
+    <label>Email</label>
+    <input type="email" id="authEmail" autocomplete="username">
+  </div>
+  <div class="auth-field">
+    <label>Пароль</label>
+    <input type="password" id="authPassword" autocomplete="current-password">
+  </div>
+  <button class="auth-btn" id="authSubmitBtn">Войти</button>
+  <div class="auth-toggle" id="authToggleRow">
+    Нет аккаунта? <a id="authToggleLink">Зарегистрироваться</a>
+  </div>
+</div>
+
+<!-- SIDE MENU -->
+<div class="side-menu-overlay" id="menuOverlay"></div>
+<div class="side-menu" id="sideMenu">
+  <button class="side-menu-close" id="menuCloseBtn">✕</button>
+  <h3>Разделы</h3>
+  <div class="side-menu-item disabled">📊 Аналитика и динамика — скоро</div>
+  <div class="side-menu-item disabled">⚖️ Трекер веса — скоро</div>
+  <div class="side-menu-item disabled">💧 Трекер воды — скоро</div>
+  <div class="side-menu-item disabled">📅 Полный календарь — скоро</div>
+  <h3>Настройки</h3>
+  <div class="side-menu-item" id="menuGoalBtn">🎯 Цель по калориям</div>
+  <div class="side-menu-item" id="menuKeyBtn">🔑 Сменить API-ключ</div>
+</div>
+
+<!-- APP -->
+<div class="receipt" id="appRoot" style="display:none">
+  <div class="header">
+    <button class="menu-btn" id="menuOpenBtn">☰</button>
+    <button class="logout-btn" id="logoutBtn">выйти</button>
+    <div class="store-name">КБЖУ ЧЕК</div>
+    <div class="store-sub">дневник питания и активности</div>
+  </div>
+
+  <div class="day-label-row"><div class="day-label" id="dayLabel">—</div></div>
+  <div class="week-strip" id="weekStrip"></div>
+
+  <div class="totals-bar" id="totalsBar">
+    <div class="tot-item kcal-item" id="kcalItem"><div class="tot-label">ккал ⚙</div><div class="tot-value" id="totKcal">0</div></div>
+    <div class="tot-item"><div class="tot-label">белки</div><div class="tot-value" id="totProtein">0</div></div>
+    <div class="tot-item"><div class="tot-label">жиры</div><div class="tot-value" id="totFat">0</div></div>
+    <div class="tot-item"><div class="tot-label">углев.</div><div class="tot-value" id="totCarbs">0</div></div>
+  </div>
+  <div class="kcal-progress-wrap">
+    <div class="kcal-progress-track"><div class="kcal-progress-fill" id="kcalFill"></div></div>
+    <div class="kcal-progress-meta"><span id="kcalMetaLeft">0 ккал</span><span id="kcalMetaRight">цель: —</span></div>
+  </div>
+
+  <div class="log" id="log"></div>
+
+  <div class="comment-btn-row">
+    <button class="comment-btn" id="commentBtn">🖋 прокомментировать день</button>
+  </div>
+
+  <div class="input-bar">
+    <textarea id="msgInput" placeholder="Напиши, что съела или чем занималась..." rows="1"></textarea>
+    <button id="sendBtn">Внести</button>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   КОНФИГУРАЦИЯ — ЗАПОЛНИ ЭТИ 3 ЗНАЧЕНИЯ ПЕРЕД ДЕПЛОЕМ
+   ============================================================ */
+const SUPABASE_URL = 'https://csxggbsxewxrgringzyb.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNzeGdnYnN4ZXd4cmdyaW5nenliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYxNzg0NjUsImV4cCI6MjEwMTc1NDQ2NX0.VMP_tjlqu1Vu_Dobbj7yvftztHNFCSq2XqXrW8kQe98';
+const ANTHROPIC_API_KEY_STORAGE = 'kbju_anthropic_key';
+
+function getAnthropicKey() {
+  let key = localStorage.getItem(ANTHROPIC_API_KEY_STORAGE);
+  if (!key) {
+    key = window.prompt('Вставь свой Anthropic API ключ (sk-ant-...). Он сохранится только в этом браузере и не попадёт в код приложения:');
+    if (key) {
+      key = key.trim();
+      localStorage.setItem(ANTHROPIC_API_KEY_STORAGE, key);
+    }
+  }
+  return key;
+}
+/* ============================================================ */
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const state = {
+  currentDate: new Date().toISOString().slice(0,10),
+  days: {},
+  calorieGoal: null,
+  userId: null
+};
+
+const MEAL_LABELS = { breakfast: 'завтрак', lunch: 'обед', dinner: 'ужин', snack: 'перекус', activity: 'активность' };
+const WEEKDAY_ABBR = ['вс','пн','вт','ср','чт','пт','сб'];
+
+function round(n) { return Math.round(n); }
+
+/* ---------------- Auth ---------------- */
+let authMode = 'signin'; // 'signin' | 'signup'
+
+function showAuthError(msg) {
+  const el = document.getElementById('authError');
+  el.textContent = msg;
+  el.style.display = msg ? 'block' : 'none';
+}
+function showAuthInfo(msg) {
+  const el = document.getElementById('authInfo');
+  el.textContent = msg;
+  el.style.display = msg ? 'block' : 'none';
+}
+
+document.getElementById('authToggleLink').addEventListener('click', () => {
+  authMode = authMode === 'signin' ? 'signup' : 'signin';
+  document.getElementById('authSubmitBtn').textContent = authMode === 'signin' ? 'Войти' : 'Создать аккаунт';
+  document.getElementById('authToggleRow').innerHTML = authMode === 'signin'
+    ? 'Нет аккаунта? <a id="authToggleLink2">Зарегистрироваться</a>'
+    : 'Уже есть аккаунт? <a id="authToggleLink2">Войти</a>';
+  document.getElementById('authToggleLink2').addEventListener('click', () => document.getElementById('authToggleLink').click());
+  showAuthError(''); showAuthInfo('');
+});
+
+document.getElementById('authSubmitBtn').addEventListener('click', async () => {
+  const email = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value;
+  showAuthError(''); showAuthInfo('');
+  if (!email || !password) { showAuthError('Заполни email и пароль'); return; }
+
+  const btn = document.getElementById('authSubmitBtn');
+  btn.disabled = true;
+
+  try {
+    if (authMode === 'signin') {
+      const { error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+    } else {
+      const { error } = await sb.auth.signUp({ email, password });
+      if (error) throw error;
+      showAuthInfo('Проверь почту — Supabase может попросить подтвердить email перед первым входом.');
+    }
+  } catch (e) {
+    showAuthError(e.message || 'Ошибка входа');
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('logoutBtn').addEventListener('click', async () => {
+  await sb.auth.signOut();
+});
+
+sb.auth.onAuthStateChange((event, session) => {
+  if (session && session.user) {
+    state.userId = session.user.id;
+    document.getElementById('authScreen').style.display = 'none';
+    document.getElementById('appRoot').style.display = 'flex';
+    init();
+  } else {
+    state.userId = null;
+    document.getElementById('appRoot').style.display = 'none';
+    document.getElementById('authScreen').style.display = 'block';
+  }
+});
+
+/* ---------------- Data layer (Supabase) ---------------- */
+async function loadDay(dateStr) {
+  if (state.days[dateStr]) return state.days[dateStr];
+  const { data, error } = await sb.from('days')
+    .select('items, comment')
+    .eq('user_id', state.userId)
+    .eq('date', dateStr)
+    .maybeSingle();
+  const result = (!error && data) ? { items: data.items || [], comment: data.comment || null } : { items: [], comment: null };
+  state.days[dateStr] = result;
+  return result;
+}
+
+async function saveDay(dateStr) {
+  const day = state.days[dateStr];
+  const { error } = await sb.from('days').upsert({
+    user_id: state.userId,
+    date: dateStr,
+    items: day.items,
+    comment: day.comment,
+    updated_at: new Date().toISOString()
+  }, { onConflict: 'user_id,date' });
+  if (error) console.error('save day failed', error);
+}
+
+async function loadSettings() {
+  const { data, error } = await sb.from('settings').select('calorie_goal').eq('user_id', state.userId).maybeSingle();
+  state.calorieGoal = (!error && data) ? data.calorie_goal : null;
+}
+
+async function saveCalorieGoal(val) {
+  state.calorieGoal = val;
+  const { error } = await sb.from('settings').upsert({
+    user_id: state.userId,
+    calorie_goal: val,
+    updated_at: new Date().toISOString()
+  }, { onConflict: 'user_id' });
+  if (error) console.error('save goal failed', error);
+}
+
+/* ---------------- Date helpers ---------------- */
+function fmtDate(d) {
+  const date = new Date(d + 'T00:00:00');
+  const todayStr = new Date().toISOString().slice(0,10);
+  const yestStr = shiftDate(todayStr, -1);
+  const tomStr = shiftDate(todayStr, 1);
+  const formatted = date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+  if (d === todayStr) return 'Сегодня, ' + formatted;
+  if (d === yestStr) return 'Вчера, ' + formatted;
+  if (d === tomStr) return 'Завтра, ' + formatted;
+  return formatted;
+}
+function shiftDate(dateStr, delta) {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + delta);
+  return d.toISOString().slice(0,10);
+}
+function getWeekDates(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  const dow = d.getDay();
+  const mondayOffset = dow === 0 ? -6 : 1 - dow;
+  const monday = new Date(d);
+  monday.setDate(d.getDate() + mondayOffset);
+  const dates = [];
+  for (let i = 0; i < 7; i++) {
+    const dt = new Date(monday);
+    dt.setDate(monday.getDate() + i);
+    dates.push(dt.toISOString().slice(0,10));
+  }
+  return dates;
+}
+
+/* ---------------- Rendering ---------------- */
+async function renderWeekStrip() {
+  const stripEl = document.getElementById('weekStrip');
+  const todayStr = new Date().toISOString().slice(0,10);
+  const week = getWeekDates(state.currentDate);
+  stripEl.innerHTML = '';
+  for (const dateStr of week) {
+    const d = new Date(dateStr + 'T00:00:00');
+    const dayData = await loadDay(dateStr);
+    const btn = document.createElement('button');
+    btn.className = 'week-day';
+    if (dateStr === todayStr) btn.classList.add('today');
+    if (dateStr === state.currentDate) btn.classList.add('selected');
+    if (dayData.items.length > 0) btn.classList.add('has-data');
+    btn.innerHTML = `<span class="wd-abbr">${WEEKDAY_ABBR[d.getDay()]}</span><span class="wd-num">${d.getDate()}</span><span class="wd-dot"></span>`;
+    btn.addEventListener('click', async () => { state.currentDate = dateStr; await render(); });
+    stripEl.appendChild(btn);
+  }
+}
+
+function renderKcalProgress(consumed) {
+  const fill = document.getElementById('kcalFill');
+  const metaLeft = document.getElementById('kcalMetaLeft');
+  const metaRight = document.getElementById('kcalMetaRight');
+  const goal = state.calorieGoal;
+  metaLeft.textContent = `${round(consumed)} ккал`;
+  if (!goal) {
+    fill.style.width = '0%'; fill.className = 'kcal-progress-fill';
+    metaRight.textContent = 'цель не задана — тапни «ккал ⚙»';
+    return;
+  }
+  const ratio = consumed / goal;
+  fill.style.width = (Math.max(0, Math.min(ratio, 1)) * 100) + '%';
+  let colorClass;
+  if (ratio > 1.15) colorClass = 'red';
+  else if (ratio >= 0.85) colorClass = 'green';
+  else if (ratio >= 0.5) colorClass = 'yellow';
+  else colorClass = 'blue';
+  fill.className = 'kcal-progress-fill ' + colorClass;
+  metaRight.textContent = `цель: ${goal} ккал`;
+}
+
+async function render() {
+  document.getElementById('dayLabel').textContent = fmtDate(state.currentDate);
+  await renderWeekStrip();
+  const day = await loadDay(state.currentDate);
+  const logEl = document.getElementById('log');
+  logEl.innerHTML = '';
+
+  const foodItems = day.items.filter(i => i.kind === 'food');
+  const activityItems = day.items.filter(i => i.kind === 'activity');
+
+  let totKcal = 0, totProtein = 0, totFat = 0, totCarbs = 0;
+  foodItems.forEach(i => { totKcal += i.kcal; totProtein += i.protein; totFat += i.fat; totCarbs += i.carbs; });
+  activityItems.forEach(i => { totKcal -= i.kcal; });
+
+  document.getElementById('totKcal').textContent = round(totKcal);
+  document.getElementById('totProtein').textContent = round(totProtein) + 'г';
+  document.getElementById('totFat').textContent = round(totFat) + 'г';
+  document.getElementById('totCarbs').textContent = round(totCarbs) + 'г';
+  renderKcalProgress(totKcal);
+
+  if (day.items.length === 0) {
+    logEl.innerHTML = '<div class="empty-state">Чек пуст.<br>Напиши внизу, что ты ела сегодня —<br>например: «на завтрак омлет из 2 яиц и тост»</div>';
+  } else {
+    const grouped = {};
+    ['breakfast','lunch','dinner','snack'].forEach(m => grouped[m] = []);
+    foodItems.forEach(i => { (grouped[i.meal] = grouped[i.meal] || []).push(i); });
+
+    for (const meal of ['breakfast','lunch','dinner','snack']) {
+      const items = grouped[meal];
+      if (!items || items.length === 0) continue;
+      const group = document.createElement('div');
+      group.className = 'meal-group';
+      let subtotal = 0, rows = '';
+      items.forEach(i => {
+        subtotal += i.kcal;
+        rows += `<div class="line-item">
+          <span class="name">${i.name}</span>
+          <span class="macro">${round(i.protein)}/${round(i.fat)}/${round(i.carbs)}</span>
+          <span class="kcal">${round(i.kcal)}</span>
+          <span class="item-actions">
+            <button class="edit-btn" data-id="${i.id}">✎</button>
+            <button class="del-btn" data-id="${i.id}">✕</button>
+          </span>
+        </div>`;
+      });
+      group.innerHTML = `<div class="meal-heading">${MEAL_LABELS[meal]}</div>${rows}
+        <div class="meal-subtotal"><span>итого</span><span>${round(subtotal)} ккал</span></div>`;
+      logEl.appendChild(group);
+    }
+
+    if (activityItems.length > 0) {
+      const group = document.createElement('div');
+      group.className = 'meal-group';
+      let rows = '';
+      activityItems.forEach(i => {
+        rows += `<div class="line-item activity">
+          <span class="name">${i.name}</span>
+          <span class="kcal">-${round(i.kcal)}</span>
+          <span class="item-actions">
+            <button class="edit-btn" data-id="${i.id}">✎</button>
+            <button class="del-btn" data-id="${i.id}">✕</button>
+          </span>
+        </div>`;
+      });
+      group.innerHTML = `<div class="meal-heading">${MEAL_LABELS.activity}</div>${rows}`;
+      logEl.appendChild(group);
+    }
+  }
+
+  if (day.comment) {
+    const stampWrap = document.createElement('div');
+    stampWrap.className = 'stamp-wrap';
+    stampWrap.innerHTML = `<div class="stamp"><div class="stamp-title">✓ проверено ии</div><div class="stamp-text">${day.comment}</div></div>`;
+    logEl.appendChild(stampWrap);
+  }
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+/* ---------------- Item edit/delete ---------------- */
+async function deleteItem(id) {
+  const day = await loadDay(state.currentDate);
+  day.items = day.items.filter(i => i.id !== id);
+  day.comment = null;
+  await saveDay(state.currentDate);
+  await render();
+}
+async function editItem(id) {
+  const day = await loadDay(state.currentDate);
+  const item = day.items.find(i => i.id === id);
+  if (!item) return;
+  let result;
+  if (item.kind === 'food') {
+    result = window.prompt('название | ккал | белки | жиры | углеводы', `${item.name} | ${round(item.kcal)} | ${round(item.protein)} | ${round(item.fat)} | ${round(item.carbs)}`);
+    if (!result) return;
+    const parts = result.split('|').map(p => p.trim());
+    if (parts.length < 5) { alert('Нужно 5 значений через |'); return; }
+    item.name = parts[0]; item.kcal = parseFloat(parts[1]) || 0; item.protein = parseFloat(parts[2]) || 0;
+    item.fat = parseFloat(parts[3]) || 0; item.carbs = parseFloat(parts[4]) || 0;
+  } else {
+    result = window.prompt('название | ккал', `${item.name} | ${round(item.kcal)}`);
+    if (!result) return;
+    const parts = result.split('|').map(p => p.trim());
+    if (parts.length < 2) { alert('Нужно 2 значения через |'); return; }
+    item.name = parts[0]; item.kcal = parseFloat(parts[1]) || 0;
+  }
+  day.comment = null;
+  await saveDay(state.currentDate);
+  await render();
+}
+
+/* ---------------- Claude API calls ---------------- */
+async function parseMessage(text) {
+  const apiKey = getAnthropicKey();
+  if (!apiKey) return [];
+  const system = `Ты — модуль разбора дневника питания. Разбей сообщение пользователя на отдельные записи: продукты питания (kind: "food") или физическую активность (kind: "activity").
+
+Для еды определи КБЖУ максимально точно, используя свои знания о продуктах (включая известные бренды и магазинные товары, если упомянуты). Определи подходящий приём пищи по контексту (завтрак/обед/ужин/перекус) — если не указано явно, оцени по времени суток или здравому смыслу, по умолчанию "snack".
+
+Для активности рассчитай примерный расход калорий исходя из типа активности, длительности и интенсивности (если вес пользователя неизвестен, используй среднее значение 65кг).
+
+Ответь СТРОГО в формате JSON без каких-либо пояснений, markdown или преамбулы. Формат:
+{"items": [
+  {"kind": "food", "name": "название продукта", "meal": "breakfast|lunch|dinner|snack", "kcal": число, "protein": число, "fat": число, "carbs": число},
+  {"kind": "activity", "name": "название активности", "kcal": число}
+]}`;
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true"
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-6",
+      max_tokens: 1000,
+      system: system,
+      messages: [{ role: "user", content: text }]
+    })
+  });
+  const data = await response.json();
+  const textBlock = (data.content || []).find(b => b.type === 'text');
+  let raw = textBlock ? textBlock.text : '{"items":[]}';
+  raw = raw.replace(/```json|```/g, '').trim();
+  try {
+    const items = JSON.parse(raw).items || [];
+    items.forEach(i => { i.id = 'item_' + Date.now() + '_' + Math.random().toString(36).slice(2,8); });
+    return items;
+  } catch (e) {
+    console.error('parse error', e, raw);
+    return [];
+  }
+}
+
+async function generateComment() {
+  const day = await loadDay(state.currentDate);
+  if (day.items.length === 0) return;
+  const apiKey = getAnthropicKey();
+  if (!apiKey) return;
+  const btn = document.getElementById('commentBtn');
+  btn.disabled = true; btn.textContent = '⏳ анализирую...';
+  const summary = day.items.map(i => {
+    if (i.kind === 'food') return `${i.name} (${MEAL_LABELS[i.meal]}): ${round(i.kcal)}ккал, Б${round(i.protein)}/Ж${round(i.fat)}/У${round(i.carbs)}`;
+    return `активность: ${i.name}, -${round(i.kcal)}ккал`;
+  }).join('\n');
+  const system = `Ты — дружелюбный, но честный нутрициолог-аналитик. Дан список того, что человек съел и какую активность выполнил за день. Дай короткий комментарий (2-4 предложения) о балансе питания, качестве рациона и рекомендацию. Пиши на "ты", тепло, но без воды и штампов. Не используй markdown. Ответь только текстом комментария, без преамбулы.`;
+  try {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true"
+      },
+      body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 300, system: system, messages: [{ role: "user", content: summary }] })
+    });
+    const data = await response.json();
+    const textBlock = (data.content || []).find(b => b.type === 'text');
+    day.comment = textBlock ? textBlock.text : 'Не удалось получить комментарий.';
+    await saveDay(state.currentDate);
+    await render();
+  } catch (e) {
+    console.error(e);
+  } finally {
+    btn.disabled = false; btn.textContent = '🖋 прокомментировать день';
+  }
+}
+
+async function promptCalorieGoal() {
+  const current = state.calorieGoal || '';
+  const result = window.prompt('Дневная цель по калориям:', current);
+  if (result === null) return;
+  const val = parseInt(result, 10);
+  if (!val || val <= 0) { alert('Введи число больше нуля'); return; }
+  await saveCalorieGoal(val);
+  await render();
+}
+
+async function handleSend() {
+  const input = document.getElementById('msgInput');
+  const text = input.value.trim();
+  if (!text) return;
+  const sendBtn = document.getElementById('sendBtn');
+  sendBtn.disabled = true; input.disabled = true;
+  const original = sendBtn.textContent; sendBtn.textContent = '...';
+  try {
+    const items = await parseMessage(text);
+    if (items.length > 0) {
+      const day = await loadDay(state.currentDate);
+      day.items.push(...items);
+      day.comment = null;
+      await saveDay(state.currentDate);
+      await render();
+      input.value = '';
+    }
+  } catch (e) {
+    console.error(e);
+  } finally {
+    sendBtn.disabled = false; input.disabled = false; sendBtn.textContent = original; input.focus();
+  }
+}
+
+/* ---------------- Event wiring ---------------- */
+document.getElementById('sendBtn').addEventListener('click', handleSend);
+document.getElementById('msgInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+});
+document.getElementById('msgInput').addEventListener('input', function() {
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 90) + 'px';
+});
+document.getElementById('kcalItem').addEventListener('click', promptCalorieGoal);
+document.getElementById('log').addEventListener('click', async (e) => {
+  const editBtn = e.target.closest('.edit-btn');
+  const delBtn = e.target.closest('.del-btn');
+  if (editBtn) await editItem(editBtn.dataset.id);
+  else if (delBtn) { if (confirm('Удалить запись?')) await deleteItem(delBtn.dataset.id); }
+});
+document.getElementById('commentBtn').addEventListener('click', generateComment);
+
+document.getElementById('menuOpenBtn').addEventListener('click', () => {
+  document.getElementById('sideMenu').classList.add('open');
+  document.getElementById('menuOverlay').classList.add('open');
+});
+function closeMenu() {
+  document.getElementById('sideMenu').classList.remove('open');
+  document.getElementById('menuOverlay').classList.remove('open');
+}
+document.getElementById('menuCloseBtn').addEventListener('click', closeMenu);
+document.getElementById('menuOverlay').addEventListener('click', closeMenu);
+document.getElementById('menuGoalBtn').addEventListener('click', () => { closeMenu(); promptCalorieGoal(); });
+document.getElementById('menuKeyBtn').addEventListener('click', () => {
+  closeMenu();
+  localStorage.removeItem(ANTHROPIC_API_KEY_STORAGE);
+  getAnthropicKey();
+});
+
+(function setupSwipe() {
+  const receiptEl = document.querySelector('.receipt');
+  let startX = 0, startY = 0, tracking = false;
+  function isInteractive(target) {
+    return target.closest('.input-bar') || target.closest('.week-strip') ||
+           target.closest('.item-actions') || target.closest('.comment-btn') ||
+           target.closest('.kcal-item') || target.closest('.menu-btn') || target.closest('.logout-btn');
+  }
+  receiptEl.addEventListener('touchstart', (e) => {
+    if (isInteractive(e.target)) { tracking = false; return; }
+    tracking = true; startX = e.touches[0].clientX; startY = e.touches[0].clientY;
+  }, { passive: true });
+  receiptEl.addEventListener('touchend', async (e) => {
+    if (!tracking) return;
+    tracking = false;
+    const deltaX = e.changedTouches[0].clientX - startX;
+    const deltaY = e.changedTouches[0].clientY - startY;
+    if (Math.abs(deltaX) > 55 && Math.abs(deltaX) > Math.abs(deltaY) * 1.5) {
+      state.currentDate = shiftDate(state.currentDate, deltaX < 0 ? 1 : -1);
+      await render();
+    }
+  }, { passive: true });
+})();
+
+async function init() {
+  await loadSettings();
+  await render();
+}
+</script>
+</body>
+</html>
