@@ -288,6 +288,35 @@
   .modal-actions .save-btn { background: var(--coral-deep); color: #fff; }
   .modal-actions .cancel-btn { background: var(--surface-soft); color: var(--ink-soft); border: 1px solid var(--line); }
 
+  /* ---------------- Goals wizard ---------------- */
+  .wizard-card { max-width: 400px; max-height: 88vh; overflow-y: auto; }
+  .auth-field select {
+    width: 100%; padding: 11px 14px; border: 1.5px solid var(--line); border-radius: 10px;
+    font-family: inherit; font-size: 14px; background: var(--surface-soft); color: var(--ink); appearance: none;
+  }
+  .auth-field select:focus { outline: none; border-color: var(--coral); }
+  .wizard-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .goal-preview {
+    background: var(--surface-soft); border: 1px dashed var(--line); border-radius: 12px;
+    padding: 12px 14px; font-size: 12.5px; line-height: 1.6; color: var(--ink-soft); margin: 4px 0 14px;
+  }
+  .goal-preview b { color: var(--coral-deep); font-family: 'Playfair Display', serif; font-size: 15px; }
+  .goal-preview .warn { color: var(--red); display: block; margin-top: 6px; }
+
+  .goal-summary-card {
+    background: var(--surface); border-radius: var(--radius); padding: 20px 22px;
+    box-shadow: 0 8px 24px rgba(43,36,32,0.06); border: 1.5px solid var(--coral-light);
+  }
+  .goal-summary-card .eyebrow { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--coral-deep); font-weight: 700; margin-bottom: 6px; }
+  .goal-summary-card h2 { font-size: 17px; font-weight: 700; margin-bottom: 6px; }
+  .goal-summary-card .muted { color: var(--ink-soft); font-size: 12.5px; line-height: 1.5; margin-bottom: 12px; }
+  .goal-kcal-badge { display: flex; align-items: baseline; gap: 6px; margin-bottom: 14px; }
+  .goal-kcal-badge b { font-family: 'Playfair Display', serif; font-size: 26px; color: var(--coral-deep); }
+  .goal-kcal-badge span { font-size: 12px; color: var(--ink-soft); }
+  .goal-summary-card button { background: var(--coral-light); border: none; color: var(--coral-deep); border-radius: 10px; padding: 9px 14px; font-size: 12.5px; font-weight: 600; }
+  .goal-summary-card button:hover { background: var(--coral); color: #fff; }
+
+
   /* ---------------- Mobile ---------------- */
   @media (max-width: 900px) {
     .sidebar {
@@ -392,6 +421,16 @@
       </section>
 
       <aside class="right-column">
+        <section class="goal-summary-card" id="goalSummaryCard" style="display:none">
+          <p class="eyebrow">ТВОЯ ЦЕЛЬ</p>
+          <h2 id="goalSummaryTitle">Цель не задана</h2>
+          <p id="goalSummaryText" class="muted">Настрой цель, и я рассчитаю твою дневную норму калорий.</p>
+          <div class="goal-kcal-badge" id="goalKcalBadge" style="display:none">
+            <b id="goalKcalBadgeValue">—</b><span>ккал / день</span>
+          </div>
+          <button id="editGoalBtn">Настроить цель <span>→</span></button>
+        </section>
+
         <section class="coach-card" id="insights">
           <div class="sparkle">✦</div>
           <p class="eyebrow">КОММЕНТАРИЙ ОТ ИИ</p>
@@ -436,15 +475,48 @@
   </div>
 </div>
 
-<!-- GOALS MODAL -->
+<!-- GOALS WIZARD MODAL -->
 <div class="modal-overlay" id="goalsModal">
-  <div class="modal-card">
-    <h3>Мои цели</h3>
-    <div class="auth-field"><label>Дневная цель по калориям</label><input type="number" id="goalKcalInput" placeholder="напр. 1750"></div>
-    <div class="auth-field"><label>Целевой вес, кг</label><input type="number" step="0.1" id="goalWeightInput" placeholder="напр. 61"></div>
+  <div class="modal-card wizard-card">
+    <h3>Настроить цель</h3>
+    <div class="auth-field">
+      <label>Что хочешь сделать?</label>
+      <select id="goalTypeInput">
+        <option value="lose">Похудеть</option>
+        <option value="gain">Набрать массу</option>
+        <option value="maintain">Сохранить текущий вес</option>
+      </select>
+    </div>
+    <div class="wizard-row">
+      <div class="auth-field"><label>Пол</label><select id="goalGenderInput"><option value="female">Женский</option><option value="male">Мужской</option></select></div>
+      <div class="auth-field"><label>Возраст</label><input type="number" id="goalAgeInput" placeholder="напр. 32"></div>
+    </div>
+    <div class="wizard-row">
+      <div class="auth-field"><label>Рост, см</label><input type="number" id="goalHeightInput" placeholder="напр. 165"></div>
+      <div class="auth-field"><label>Текущий вес, кг</label><input type="number" step="0.1" id="goalCurrentWeightInput" placeholder="напр. 64"></div>
+    </div>
+    <div class="auth-field" id="goalWeightRow">
+      <label>Целевой вес, кг</label>
+      <input type="number" step="0.1" id="goalWeightInput" placeholder="напр. 60">
+    </div>
+    <div class="auth-field">
+      <label>Уровень активности</label>
+      <select id="goalActivityInput">
+        <option value="sedentary">Малоподвижный (сидячая работа)</option>
+        <option value="light">Лёгкая активность (тренировки 1–3 раза/нед)</option>
+        <option value="moderate">Умеренная (тренировки 3–5 раз/нед)</option>
+        <option value="active">Высокая (тренировки 6–7 раз/нед)</option>
+        <option value="very_active">Очень высокая (физ. работа + тренировки)</option>
+      </select>
+    </div>
+    <div class="auth-field" id="goalRateRow">
+      <label>Темп изменения веса, кг/неделю (максимум 1)</label>
+      <input type="number" step="0.1" min="0.1" max="1" id="goalRateInput" placeholder="напр. 0.5">
+    </div>
+    <div class="goal-preview" id="goalPreview" style="display:none"></div>
     <div class="modal-actions">
       <button class="cancel-btn" id="goalsModalCancel">Отмена</button>
-      <button class="save-btn" id="goalsModalSave">Сохранить</button>
+      <button class="save-btn" id="goalsModalSave">Рассчитать и сохранить</button>
     </div>
   </div>
 </div>
@@ -473,6 +545,12 @@ const state = {
   days: {},
   calorieGoal: null,
   goalWeight: null,
+  goalType: null,
+  gender: null,
+  age: null,
+  heightCm: null,
+  activityLevel: null,
+  rateKgWeek: null,
   userId: null,
   userEmail: null,
   calMonth: new Date().getMonth(),
@@ -558,14 +636,51 @@ async function saveDay(dateStr) {
   invalidateCalDot(dateStr);
 }
 async function loadSettings() {
-  const { data, error } = await sb.from('settings').select('calorie_goal, goal_weight').eq('user_id', state.userId).maybeSingle();
+  const { data, error } = await sb.from('settings')
+    .select('calorie_goal, goal_weight, goal_type, gender, age, height_cm, activity_level, rate_kg_week')
+    .eq('user_id', state.userId).maybeSingle();
   state.calorieGoal = (!error && data) ? data.calorie_goal : null;
   state.goalWeight = (!error && data) ? data.goal_weight : null;
+  state.goalType = (!error && data) ? data.goal_type : null;
+  state.gender = (!error && data) ? data.gender : null;
+  state.age = (!error && data) ? data.age : null;
+  state.heightCm = (!error && data) ? data.height_cm : null;
+  state.activityLevel = (!error && data) ? data.activity_level : null;
+  state.rateKgWeek = (!error && data) ? data.rate_kg_week : null;
 }
-async function saveSettings(calorieGoal, goalWeight) {
-  state.calorieGoal = calorieGoal; state.goalWeight = goalWeight;
-  const { error } = await sb.from('settings').upsert({ user_id: state.userId, calorie_goal: calorieGoal, goal_weight: goalWeight, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+async function saveSettingsFull(fields) {
+  Object.assign(state, fields);
+  const { error } = await sb.from('settings').upsert({
+    user_id: state.userId,
+    calorie_goal: fields.calorieGoal, goal_weight: fields.goalWeight, goal_type: fields.goalType,
+    gender: fields.gender, age: fields.age, height_cm: fields.heightCm,
+    activity_level: fields.activityLevel, rate_kg_week: fields.rateKgWeek,
+    updated_at: new Date().toISOString()
+  }, { onConflict: 'user_id' });
   if (error) console.error('save settings failed', error);
+}
+
+const ACTIVITY_MULTIPLIERS = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725, very_active: 1.9 };
+const GOAL_TYPE_LABELS = { lose: 'Похудеть', gain: 'Набрать массу', maintain: 'Сохранить вес' };
+
+function computeCalorieTarget({ gender, age, heightCm, weightKg, activityLevel, goalType, rateKgWeek }) {
+  const bmr = gender === 'male'
+    ? 10*weightKg + 6.25*heightCm - 5*age + 5
+    : 10*weightKg + 6.25*heightCm - 5*age - 161;
+  const tdee = bmr * (ACTIVITY_MULTIPLIERS[activityLevel] || 1.375);
+  const rate = Math.max(0, Math.min(rateKgWeek || 0, 1)); // безопасный предел: не больше 1 кг/нед
+  const dailyAdjust = (rate * 7700) / 7;
+  let target = tdee;
+  if (goalType === 'lose') target = tdee - dailyAdjust;
+  else if (goalType === 'gain') target = tdee + dailyAdjust;
+
+  const floor = gender === 'male' ? 1500 : 1200;
+  let note = '';
+  if (goalType === 'lose' && target < floor) {
+    target = floor;
+    note = `Расчётный дефицит был слишком большим для безопасного темпа — цель скорректирована до минимально рекомендуемых ${floor} ккал/день.`;
+  }
+  return { bmr: Math.round(bmr), tdee: Math.round(tdee), target: Math.round(target), note };
 }
 async function loadWeightLog(limit) {
   const { data, error } = await sb.from('weight_log').select('date, weight_kg').eq('user_id', state.userId).order('date', { ascending: true }).limit(limit || 60);
@@ -678,7 +793,8 @@ async function renderDiary() {
       let rowsHtml = '';
       items.forEach(i => {
         subtotal += i.kcal;
-        rowsHtml += `<div data-id="${i.id}"><b>${i.name}</b><span>Б ${round(i.protein)} · Ж ${round(i.fat)} · У ${round(i.carbs)}</span></div><strong>${round(i.kcal)}</strong>`;
+        const liquidTag = i.liquid_ml ? ` · 💧${round(i.liquid_ml)} мл` : '';
+        rowsHtml += `<div data-id="${i.id}"><b>${i.name}</b><span>Б ${round(i.protein)} · Ж ${round(i.fat)} · У ${round(i.carbs)}${liquidTag}</span></div><strong>${round(i.kcal)}</strong>`;
       });
       article.innerHTML = `
         <div class="meal-icon">${MEAL_ICON[meal]}</div>
@@ -772,11 +888,13 @@ async function parseMessage(text) {
 
 Для еды определи КБЖУ максимально точно, используя свои знания о продуктах (включая известные бренды и магазинные товары, если упомянуты). Определи подходящий приём пищи по контексту (завтрак/обед/ужин/перекус) — если не указано явно, оцени по времени суток или здравому смыслу, по умолчанию "snack".
 
+Если продукт — это напиток или жидкая пища (кофе, чай, вода, сок, молоко, суп, смузи и т.п.), дополнительно укажи поле "liquid_ml" — объём жидкости в миллилитрах, который идёт в счётчик выпитой воды (это ОТДЕЛЬНО от калорий: у кофе с молоком и сахаром есть и калории, и объём жидкости — укажи оба). Для твёрдой еды без заметного объёма жидкости поле "liquid_ml" не указывай или укажи 0.
+
 Для активности рассчитай примерный расход калорий исходя из типа активности, длительности и интенсивности (если вес пользователя неизвестен, используй среднее значение 65кг).
 
 Ответь СТРОГО в формате JSON без каких-либо пояснений, markdown или преамбулы. Формат:
 {"items": [
-  {"kind": "food", "name": "название продукта", "meal": "breakfast|lunch|dinner|snack", "kcal": число, "protein": число, "fat": число, "carbs": число},
+  {"kind": "food", "name": "название продукта", "meal": "breakfast|lunch|dinner|snack", "kcal": число, "protein": число, "fat": число, "carbs": число, "liquid_ml": число_или_0},
   {"kind": "activity", "name": "название активности", "kcal": число}
 ]}`;
   const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -835,6 +953,14 @@ async function handleSend() {
       day.items.push(...items);
       day.comment = null;
       await saveDay(state.currentDate);
+
+      const liquidMl = items.reduce((sum, i) => sum + (i.liquid_ml || 0), 0);
+      if (liquidMl > 0) {
+        const currentWater = await loadWater(state.currentDate);
+        await saveWater(state.currentDate, currentWater + liquidMl);
+        await renderWater();
+      }
+
       await renderDiary();
       await renderCalendarDots();
       input.value = '';
@@ -988,23 +1114,96 @@ document.addEventListener('click', (e) => {
 document.getElementById('calPrev').addEventListener('click', async () => { state.calMonth--; if (state.calMonth < 0) { state.calMonth = 11; state.calYear--; } await renderCalendar(); });
 document.getElementById('calNext').addEventListener('click', async () => { state.calMonth++; if (state.calMonth > 11) { state.calMonth = 0; state.calYear++; } await renderCalendar(); });
 
-/* ---------------- Goals modal ---------------- */
-function openGoalsModal() {
-  document.getElementById('goalKcalInput').value = state.calorieGoal || '';
+/* ---------------- Goals wizard ---------------- */
+function toggleWizardRows() {
+  const goalType = document.getElementById('goalTypeInput').value;
+  document.getElementById('goalWeightRow').style.display = goalType === 'maintain' ? 'none' : '';
+  document.getElementById('goalRateRow').style.display = goalType === 'maintain' ? 'none' : '';
+}
+function updateWizardPreview() {
+  const gender = document.getElementById('goalGenderInput').value;
+  const age = parseInt(document.getElementById('goalAgeInput').value, 10);
+  const heightCm = parseFloat(document.getElementById('goalHeightInput').value);
+  const weightKg = parseFloat(document.getElementById('goalCurrentWeightInput').value.replace(',','.'));
+  const activityLevel = document.getElementById('goalActivityInput').value;
+  const goalType = document.getElementById('goalTypeInput').value;
+  const rateKgWeek = parseFloat(document.getElementById('goalRateInput').value.replace(',','.')) || 0;
+  const preview = document.getElementById('goalPreview');
+  if (!age || !heightCm || !weightKg) { preview.style.display = 'none'; return; }
+  const result = computeCalorieTarget({ gender, age, heightCm, weightKg, activityLevel, goalType, rateKgWeek });
+  preview.style.display = 'block';
+  preview.innerHTML = `Базовый обмен (BMR): ~${result.bmr} ккал · с учётом активности: ~${result.tdee} ккал.<br>Рекомендуемая дневная норма: <b>${result.target} ккал</b>` + (result.note ? `<span class="warn">⚠ ${result.note}</span>` : '');
+}
+async function openGoalsModal() {
+  document.getElementById('goalTypeInput').value = state.goalType || 'lose';
+  document.getElementById('goalGenderInput').value = state.gender || 'female';
+  document.getElementById('goalAgeInput').value = state.age || '';
+  document.getElementById('goalHeightInput').value = state.heightCm || '';
+  document.getElementById('goalActivityInput').value = state.activityLevel || 'light';
+  document.getElementById('goalRateInput').value = state.rateKgWeek || 0.5;
   document.getElementById('goalWeightInput').value = state.goalWeight || '';
+  const log = await loadWeightLog(1);
+  const latestWeight = log.length > 0 ? log[log.length-1].weight_kg : '';
+  document.getElementById('goalCurrentWeightInput').value = latestWeight;
+  toggleWizardRows();
+  updateWizardPreview();
   document.getElementById('goalsModal').classList.add('open');
 }
 document.getElementById('goalsModalOpenBtn').addEventListener('click', openGoalsModal);
+document.getElementById('editGoalBtn').addEventListener('click', openGoalsModal);
 document.getElementById('goalPill').addEventListener('click', openGoalsModal);
+document.getElementById('goalTypeInput').addEventListener('change', () => { toggleWizardRows(); updateWizardPreview(); });
+['goalGenderInput','goalAgeInput','goalHeightInput','goalCurrentWeightInput','goalActivityInput','goalRateInput'].forEach(id => {
+  document.getElementById(id).addEventListener('input', updateWizardPreview);
+  document.getElementById(id).addEventListener('change', updateWizardPreview);
+});
 document.getElementById('goalsModalCancel').addEventListener('click', () => document.getElementById('goalsModal').classList.remove('open'));
 document.getElementById('goalsModalSave').addEventListener('click', async () => {
-  const kcal = parseInt(document.getElementById('goalKcalInput').value, 10) || null;
-  const weight = parseFloat(document.getElementById('goalWeightInput').value.replace(',','.')) || null;
-  await saveSettings(kcal, weight);
+  const goalType = document.getElementById('goalTypeInput').value;
+  const gender = document.getElementById('goalGenderInput').value;
+  const age = parseInt(document.getElementById('goalAgeInput').value, 10);
+  const heightCm = parseFloat(document.getElementById('goalHeightInput').value);
+  const currentWeight = parseFloat(document.getElementById('goalCurrentWeightInput').value.replace(',','.'));
+  const activityLevel = document.getElementById('goalActivityInput').value;
+  let goalWeight = parseFloat(document.getElementById('goalWeightInput').value.replace(',','.')) || null;
+  let rateKgWeek = parseFloat(document.getElementById('goalRateInput').value.replace(',','.')) || 0;
+
+  if (!age || !heightCm || !currentWeight) { alert('Заполни возраст, рост и текущий вес'); return; }
+  if (goalType === 'maintain') { goalWeight = currentWeight; rateKgWeek = 0; }
+  if (!goalWeight) { alert('Укажи целевой вес'); return; }
+
+  const result = computeCalorieTarget({ gender, age, heightCm, weightKg: currentWeight, activityLevel, goalType, rateKgWeek });
+
+  await saveSettingsFull({
+    calorieGoal: result.target, goalWeight, goalType, gender, age, heightCm, activityLevel, rateKgWeek
+  });
+  await saveWeight(new Date().toISOString().slice(0,10), currentWeight);
+
   document.getElementById('goalsModal').classList.remove('open');
   await renderDiary();
   await renderHero();
+  await renderWeight();
+  renderGoalSummary();
+  if (result.note) alert(result.note);
 });
+
+function renderGoalSummary() {
+  const card = document.getElementById('goalSummaryCard');
+  const badge = document.getElementById('goalKcalBadge');
+  if (!state.calorieGoal || !state.goalType) {
+    card.style.display = '';
+    document.getElementById('goalSummaryTitle').textContent = 'Цель не задана';
+    document.getElementById('goalSummaryText').textContent = 'Настрой цель, и я рассчитаю твою дневную норму калорий.';
+    badge.style.display = 'none';
+    return;
+  }
+  card.style.display = '';
+  document.getElementById('goalSummaryTitle').textContent = GOAL_TYPE_LABELS[state.goalType] || 'Цель';
+  const rateText = state.goalType !== 'maintain' && state.rateKgWeek ? ` · темп ~${state.rateKgWeek} кг/нед` : '';
+  document.getElementById('goalSummaryText').textContent = `Целевой вес: ${state.goalWeight} кг${rateText}`;
+  badge.style.display = 'flex';
+  document.getElementById('goalKcalBadgeValue').textContent = state.calorieGoal;
+}
 
 /* ---------------- Day switcher / top label ---------------- */
 async function renderDateHeader() {
@@ -1024,9 +1223,11 @@ function applyView(view) {
   const coach = document.querySelector('.coach-card');
   const water = document.querySelector('.water-card');
   const weightCard = document.getElementById('goals');
+  const goalSummary = document.getElementById('goalSummaryCard');
   const contentGrid = document.querySelector('.content-grid');
 
   [hero, balance, diaryS, rightCol, coach, water, weightCard].forEach(el => { el.style.display = ''; });
+  goalSummary.style.display = 'none';
   contentGrid.style.gridTemplateColumns = '';
 
   if (view === 'diary') {
@@ -1039,6 +1240,7 @@ function applyView(view) {
   } else if (view === 'goals') {
     hero.style.display = 'none'; balance.style.display = 'none'; diaryS.style.display = 'none';
     coach.style.display = 'none';
+    goalSummary.style.display = '';
     contentGrid.style.gridTemplateColumns = '1fr';
   }
   // 'dashboard' — всё видно (уже сброшено выше)
@@ -1104,6 +1306,7 @@ async function refreshAll() {
 async function init() {
   applyView('dashboard');
   await loadSettings();
+  renderGoalSummary();
   await renderHero();
   await refreshAll();
 }
