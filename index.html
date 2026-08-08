@@ -1015,18 +1015,51 @@ async function renderDateHeader() {
 document.getElementById('prevDay').addEventListener('click', async () => { state.currentDate = shiftDate(state.currentDate, -1); await refreshAll(); });
 document.getElementById('nextDay').addEventListener('click', async () => { state.currentDate = shiftDate(state.currentDate, 1); await refreshAll(); });
 
-/* ---------------- Sidebar nav (in-page anchors) ---------------- */
+/* ---------------- Sidebar nav (tab-style section switching) ---------------- */
+function applyView(view) {
+  const hero = document.querySelector('.hero');
+  const balance = document.querySelector('.balance-card');
+  const diaryS = document.getElementById('diary');
+  const rightCol = document.querySelector('.right-column');
+  const coach = document.querySelector('.coach-card');
+  const water = document.querySelector('.water-card');
+  const weightCard = document.getElementById('goals');
+  const contentGrid = document.querySelector('.content-grid');
+
+  [hero, balance, diaryS, rightCol, coach, water, weightCard].forEach(el => { el.style.display = ''; });
+  contentGrid.style.gridTemplateColumns = '';
+
+  if (view === 'diary') {
+    hero.style.display = 'none'; balance.style.display = 'none'; rightCol.style.display = 'none';
+    contentGrid.style.gridTemplateColumns = '1fr';
+  } else if (view === 'insights') {
+    hero.style.display = 'none'; balance.style.display = 'none'; diaryS.style.display = 'none';
+    water.style.display = 'none'; weightCard.style.display = 'none';
+    contentGrid.style.gridTemplateColumns = '1fr';
+  } else if (view === 'goals') {
+    hero.style.display = 'none'; balance.style.display = 'none'; diaryS.style.display = 'none';
+    coach.style.display = 'none';
+    contentGrid.style.gridTemplateColumns = '1fr';
+  }
+  // 'dashboard' — всё видно (уже сброшено выше)
+  window.scrollTo({ top: 0, behavior: 'instant' });
+}
+
 document.getElementById('sideNav').addEventListener('click', (e) => {
   const link = e.target.closest('.nav-item');
   if (!link) return;
   e.preventDefault();
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   link.classList.add('active');
-  const target = document.getElementById(link.dataset.target);
-  if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  applyView(link.dataset.target);
   closeSidebarMobile();
 });
-document.getElementById('addEntry').addEventListener('click', () => document.getElementById('chatInput').focus());
+document.getElementById('addEntry').addEventListener('click', () => {
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelector('.nav-item[data-target="dashboard"]').classList.add('active');
+  applyView('dashboard');
+  document.getElementById('chatInput').focus();
+});
 
 /* ---------------- Mobile sidebar ---------------- */
 function openSidebarMobile() { document.getElementById('sidebar').classList.add('open'); document.getElementById('sidebarOverlay').classList.add('open'); }
@@ -1069,6 +1102,7 @@ async function refreshAll() {
   if (document.getElementById('calendar').classList.contains('open')) await renderCalendar();
 }
 async function init() {
+  applyView('dashboard');
   await loadSettings();
   await renderHero();
   await refreshAll();
