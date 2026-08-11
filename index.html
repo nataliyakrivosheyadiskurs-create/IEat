@@ -235,7 +235,11 @@
   .water-glasses i.filled { background: var(--carbs); }
   .water-hint { font-size: 11.5px; color: var(--ink-soft); }
 
-  .weight-card { display: flex; align-items: center; justify-content: space-between; gap: 14px; cursor: pointer; }
+  .weight-card { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+  .weight-top-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .weight-top-row .eyebrow { margin: 0; }
+  #weightAddBtn { width: 26px; height: 26px; border-radius: 50%; border: none; background: var(--coral-light); color: var(--coral-deep); font-size: 15px; font-weight: 700; line-height: 1; }
+  #weightAddBtn:hover { background: var(--coral); color: #fff; }
   .weight-card .eyebrow { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--ink-soft); }
   .weight-card h3 { font-size: 22px; font-weight: 700; margin-top: 2px; }
   .weight-card h3 small { font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--ink-soft); font-weight: 400; }
@@ -450,9 +454,9 @@
 
         <section class="weight-card" id="goals">
           <div>
-            <p class="eyebrow">ВЕС</p>
+            <div class="weight-top-row"><p class="eyebrow">ВЕС</p><button id="weightAddBtn" title="Внести вес">+</button></div>
             <h3 id="weightLabel">— <small>кг</small></h3>
-            <span id="weightDelta">Нажми, чтобы внести</span>
+            <span id="weightDelta">Нажми «+», чтобы внести вес</span>
           </div>
           <svg viewBox="0 0 180 64" id="weightSpark" aria-label="График веса"></svg>
         </section>
@@ -1055,7 +1059,8 @@ async function renderWeight() {
     <path d="${fill}" fill="url(#fade)"/>
     <defs><linearGradient id="fade" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#F7CBBD" stop-opacity=".7"/><stop offset="1" stop-color="#F7CBBD" stop-opacity="0"/></linearGradient></defs>` : '';
 }
-document.getElementById('goals').addEventListener('click', async () => {
+document.getElementById('weightAddBtn').addEventListener('click', async (e) => {
+  e.stopPropagation();
   const result = window.prompt('Внести вес на сегодня, кг:');
   if (!result) return;
   const val = parseFloat(result.replace(',', '.'));
