@@ -156,6 +156,7 @@
   .ring b { display: block; font-family: 'Playfair Display', serif; font-size: 21px; }
   .ring span { font-size: 10.5px; color: var(--ink-soft); }
   .ring-note { font-size: 11.5px; color: var(--ink-soft); }
+  .ring-breakdown { font-size: 10.5px; color: var(--ink-faint); margin-top: 2px; }
   .balance-stat span { display: block; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--ink-soft); margin-bottom: 6px; }
   .balance-stat b { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 700; }
   .balance-stat b small { font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500; color: var(--ink-soft); }
@@ -320,6 +321,28 @@
   .goal-summary-card button { background: var(--coral-light); border: none; color: var(--coral-deep); border-radius: 10px; padding: 9px 14px; font-size: 12.5px; font-weight: 600; }
   .goal-summary-card button:hover { background: var(--coral); color: #fff; }
 
+  /* ---------------- Period analytics ---------------- */
+  .period-analytics-card { background: var(--surface); border-radius: var(--radius); padding: 20px 22px; box-shadow: 0 8px 24px rgba(43,36,32,0.06); }
+  .period-analytics-card .eyebrow { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--coral-deep); font-weight: 700; margin-bottom: 10px; }
+  .period-tabs { display: flex; gap: 6px; margin-bottom: 18px; }
+  .period-tab { flex: 1; background: var(--surface-soft); border: 1.5px solid var(--line); border-radius: 10px; padding: 8px; font-size: 12.5px; font-weight: 600; color: var(--ink-soft); }
+  .period-tab.active { background: var(--coral-deep); border-color: var(--coral-deep); color: #fff; }
+  .period-tab:not(.active):hover { border-color: var(--coral); color: var(--coral-deep); }
+  .period-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
+  .period-stats > div { background: var(--surface-soft); border-radius: 10px; padding: 10px 8px; text-align: center; }
+  .period-stats span { display: block; font-size: 10px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 4px; }
+  .period-stats b { font-family: 'Playfair Display', serif; font-size: 15.5px; }
+  .chart-label { font-size: 11.5px; color: var(--ink-soft); margin: 0 0 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .period-bars { display: flex; align-items: flex-end; gap: 3px; height: 70px; margin-bottom: 20px; }
+  .period-bar { flex: 1; height: 100%; display: flex; align-items: flex-end; background: var(--surface-soft); border-radius: 3px; overflow: hidden; }
+  .period-bar .bar-fill { width: 100%; border-radius: 3px 3px 0 0; transition: height 0.3s ease; }
+  .period-weight-svg { width: 100%; height: 60px; margin-bottom: 6px; }
+  .period-weight-summary { font-size: 12px; color: var(--ink-soft); line-height: 1.5; margin-bottom: 18px; }
+  .period-recommend-btn { width: 100%; background: var(--coral-light); border: none; color: var(--coral-deep); border-radius: 10px; padding: 11px; font-size: 13px; font-weight: 600; }
+  .period-recommend-btn:hover { background: var(--coral); color: #fff; }
+  .period-recommend-btn:disabled { opacity: 0.5; }
+  .period-recommend-text { margin-top: 14px; font-size: 13px; line-height: 1.6; color: var(--ink); background: var(--surface-soft); border-radius: 10px; padding: 12px 14px; }
+
 
   /* ---------------- Mobile ---------------- */
   @media (max-width: 900px) {
@@ -404,8 +427,9 @@
 
     <section class="balance-card">
       <div class="ring-wrap">
-        <div class="ring" id="kcalRing"><div><b id="ringKcal">0</b><span>ккал съедено</span></div></div>
+        <div class="ring" id="kcalRing"><div><b id="ringKcal">0</b><span>чистый баланс</span></div></div>
         <span class="ring-note" id="ringGoalNote">цель не задана</span>
+        <span class="ring-breakdown" id="ringBreakdown">0 потреблено · 0 сожжено</span>
       </div>
       <div class="balance-stat remaining"><span>Осталось</span><b id="statRemaining">0 <small>ккал</small></b><div class="progress"><i id="statRemainingBar" style="width:0%"></i></div></div>
       <div class="balance-stat"><span>Сожжено</span><b id="statBurned">0 <small>ккал</small></b></div>
@@ -441,6 +465,27 @@
           <h2 id="coachTitle">Пока пусто</h2>
           <p id="coachText">Внеси хотя бы одну запись за день, и я смогу дать комментарий по балансу питания.</p>
           <button id="coachBtn">Прокомментировать день <span>→</span></button>
+        </section>
+
+        <section class="period-analytics-card" id="periodAnalyticsCard" style="display:none">
+          <p class="eyebrow">ПЕРИОД</p>
+          <div class="period-tabs">
+            <button class="period-tab active" data-period="7">Неделя</button>
+            <button class="period-tab" data-period="14">2 недели</button>
+            <button class="period-tab" data-period="30">Месяц</button>
+          </div>
+
+          <div class="period-stats" id="periodStats"></div>
+
+          <p class="chart-label">Калории по дням</p>
+          <div class="period-bars" id="periodBars"></div>
+
+          <p class="chart-label">Динамика веса</p>
+          <svg viewBox="0 0 320 70" id="periodWeightChart" class="period-weight-svg"></svg>
+          <p class="period-weight-summary" id="periodWeightSummary">—</p>
+
+          <button class="period-recommend-btn" id="periodRecommendBtn">Получить рекомендации от ИИ <span>→</span></button>
+          <div class="period-recommend-text" id="periodRecommendText" style="display:none"></div>
         </section>
 
         <section class="water-card">
@@ -555,6 +600,8 @@ const state = {
   heightCm: null,
   activityLevel: null,
   rateKgWeek: null,
+  periodDays: 7,
+  periodSummaryText: '',
   userId: null,
   userEmail: null,
   calMonth: new Date().getMonth(),
@@ -690,6 +737,14 @@ async function loadWeightLog(limit) {
   const { data, error } = await sb.from('weight_log').select('date, weight_kg').eq('user_id', state.userId).order('date', { ascending: true }).limit(limit || 60);
   return (!error && data) ? data : [];
 }
+async function loadWeightRange(startDate, endDate) {
+  const { data, error } = await sb.from('weight_log').select('date, weight_kg').eq('user_id', state.userId).gte('date', startDate).lte('date', endDate).order('date', { ascending: true });
+  return (!error && data) ? data : [];
+}
+async function loadDaysRange(startDate, endDate) {
+  const { data, error } = await sb.from('days').select('date, items').eq('user_id', state.userId).gte('date', startDate).lte('date', endDate).order('date', { ascending: true });
+  return (!error && data) ? data : [];
+}
 async function saveWeight(dateStr, kg) {
   const { error } = await sb.from('weight_log').upsert({ user_id: state.userId, date: dateStr, weight_kg: kg, updated_at: new Date().toISOString() }, { onConflict: 'user_id,date' });
   if (error) console.error('save weight failed', error);
@@ -740,12 +795,13 @@ function colorForRatio(ratio) {
   return 'var(--blue)';
 }
 
-function renderBalance(totKcal, totProtein, totFat, totCarbs, burned) {
-  document.getElementById('ringKcal').textContent = round(totKcal);
+function renderBalance(netKcal, totProtein, totFat, totCarbs, burned, consumed) {
+  document.getElementById('ringKcal').textContent = round(netKcal);
   document.getElementById('macroProtein').textContent = round(totProtein) + ' г';
   document.getElementById('macroFat').textContent = round(totFat) + ' г';
   document.getElementById('macroCarbs').textContent = round(totCarbs) + ' г';
   document.getElementById('statBurned').innerHTML = round(burned) + ' <small>ккал</small>';
+  document.getElementById('ringBreakdown').textContent = `${round(consumed)} потреблено · ${round(burned)} сожжено`;
 
   const ring = document.getElementById('kcalRing');
   const goal = state.calorieGoal;
@@ -756,12 +812,12 @@ function renderBalance(totKcal, totProtein, totFat, totCarbs, burned) {
     document.getElementById('statRemainingBar').style.width = '0%';
     return;
   }
-  const ratio = totKcal / goal;
+  const ratio = netKcal / goal;
   const angle = Math.max(0, Math.min(ratio, 1)) * 360;
   const color = colorForRatio(ratio);
   ring.style.background = `conic-gradient(${color} ${angle}deg, var(--line) ${angle}deg)`;
   document.getElementById('ringGoalNote').textContent = `из ${goal} ккал`;
-  const remaining = goal - totKcal;
+  const remaining = goal - netKcal;
   document.getElementById('statRemaining').innerHTML = (remaining >= 0 ? round(remaining) : '+' + round(-remaining)) + ' <small>ккал</small>';
   document.getElementById('statRemainingBar').style.width = (Math.max(0, Math.min(ratio,1)) * 100) + '%';
   document.getElementById('statRemainingBar').style.background = color;
@@ -779,7 +835,7 @@ async function renderDiary() {
   let totKcal = 0, totProtein = 0, totFat = 0, totCarbs = 0, burned = 0;
   foodItems.forEach(i => { totKcal += i.kcal; totProtein += i.protein; totFat += i.fat; totCarbs += i.carbs; });
   activityItems.forEach(i => { burned += i.kcal; });
-  renderBalance(totKcal - burned, totProtein, totFat, totCarbs, burned);
+  renderBalance(totKcal - burned, totProtein, totFat, totCarbs, burned, totKcal);
 
   if (day.items.length === 0) {
     timeline.innerHTML = '<div class="empty-diary">Пока пусто. Напиши в чат внизу, что ты ела — например «на завтрак омлет из 2 яиц и тост».</div>';
@@ -1018,9 +1074,10 @@ document.getElementById('waterAdd').addEventListener('click', async () => {
 });
 
 /* ---------------- Weight ---------------- */
-function buildSparkPath(points) {
+function buildSparkPath(points, w, h) {
+  w = w || 180; h = h || 64;
   if (points.length < 2) return { line: '', fill: '' };
-  const w = 180, h = 64, pad = 6;
+  const pad = 6;
   const values = points.map(p => p.weight_kg);
   const min = Math.min(...values), max = Math.max(...values);
   const range = (max - min) || 1;
@@ -1035,6 +1092,129 @@ function buildSparkPath(points) {
   const fill = line + ` L${coords[coords.length-1][0].toFixed(1)} ${h} L${coords[0][0].toFixed(1)} ${h} Z`;
   return { line, fill };
 }
+
+/* ---------------- Period analytics ---------------- */
+function buildPeriodSummaryText(agg) {
+  let text = `Период: последние ${agg.days} дней. Записи о еде/активности вносились в ${agg.loggedCount} из ${agg.days} дней.\n`;
+  text += `Среднее потребление в дни с записями: ${round(agg.avgConsumed)} ккал/день, среднее сожжено активностью: ${round(agg.avgBurned)} ккал/день.\n`;
+  text += `Средние макросы за день: белки ${round(agg.avgP)}г, жиры ${round(agg.avgF)}г, углеводы ${round(agg.avgC)}г.\n`;
+  if (state.calorieGoal) text += `Целевая калорийность: ${state.calorieGoal} ккал/день (цель: ${GOAL_TYPE_LABELS[state.goalType] || 'не указана'}).\n`;
+  if (agg.weightRows.length >= 2) {
+    const first = agg.weightRows[0].weight_kg, last = agg.weightRows[agg.weightRows.length-1].weight_kg;
+    const delta = Math.round((last-first)*10)/10;
+    text += `Вес изменился с ${first} до ${last} кг (${delta>=0?'+':''}${delta} кг) за период.\n`;
+  }
+  if (state.goalWeight) text += `Целевой вес: ${state.goalWeight} кг.\n`;
+  return text;
+}
+
+async function renderPeriodAnalytics() {
+  const days = state.periodDays;
+  const todayStr = new Date().toISOString().slice(0,10);
+  const startDate = shiftDate(todayStr, -(days-1));
+  const [daysRows, weightRows] = await Promise.all([loadDaysRange(startDate, todayStr), loadWeightRange(startDate, todayStr)]);
+
+  const dayMap = {};
+  daysRows.forEach(r => {
+    let consumed=0, burned=0, p=0, f=0, c=0;
+    (r.items || []).forEach(it => {
+      if (it.kind === 'food') { consumed += it.kcal; p += it.protein; f += it.fat; c += it.carbs; }
+      else if (it.kind === 'activity') { burned += it.kcal; }
+    });
+    dayMap[r.date] = { consumed, burned, p, f, c };
+  });
+
+  const fullRange = [];
+  for (let i = 0; i < days; i++) fullRange.push(shiftDate(startDate, i));
+
+  let totalConsumed=0, totalBurned=0, totalP=0, totalF=0, totalC=0, loggedCount=0;
+  const barsData = fullRange.map(d => {
+    const v = dayMap[d] || { consumed:0, burned:0, p:0, f:0, c:0 };
+    if (v.consumed > 0 || v.burned > 0) {
+      loggedCount++; totalConsumed += v.consumed; totalBurned += v.burned; totalP += v.p; totalF += v.f; totalC += v.c;
+    }
+    return { date: d, net: v.consumed - v.burned, consumed: v.consumed, burned: v.burned };
+  });
+
+  const avgConsumed = loggedCount ? totalConsumed/loggedCount : 0;
+  const avgBurned = loggedCount ? totalBurned/loggedCount : 0;
+  const avgP = loggedCount ? totalP/loggedCount : 0;
+  const avgF = loggedCount ? totalF/loggedCount : 0;
+  const avgC = loggedCount ? totalC/loggedCount : 0;
+
+  document.getElementById('periodStats').innerHTML = `
+    <div><span>Дней с записями</span><b>${loggedCount} из ${days}</b></div>
+    <div><span>Ср. потреблено</span><b>${round(avgConsumed)} ккал</b></div>
+    <div><span>Ср. сожжено</span><b>${round(avgBurned)} ккал</b></div>
+    <div><span>Ср. белки</span><b>${round(avgP)} г</b></div>
+    <div><span>Ср. жиры</span><b>${round(avgF)} г</b></div>
+    <div><span>Ср. углеводы</span><b>${round(avgC)} г</b></div>`;
+
+  const maxVal = Math.max(...barsData.map(b => b.consumed), state.calorieGoal || 0, 1);
+  document.getElementById('periodBars').innerHTML = barsData.map(b => {
+    const h = b.consumed > 0 ? Math.max(3, (b.consumed/maxVal)*100) : 0;
+    let color = 'var(--coral)';
+    if (b.consumed > 0 && state.calorieGoal) color = colorForRatio(b.net / state.calorieGoal);
+    const dLabel = new Date(b.date+'T00:00:00').toLocaleDateString('ru-RU', { day:'numeric', month:'numeric' });
+    return `<div class="period-bar" title="${dLabel}: ${round(b.consumed)} ккал"><div class="bar-fill" style="height:${h}%;background:${color}"></div></div>`;
+  }).join('');
+
+  const weightSvg = document.getElementById('periodWeightChart');
+  const weightSummaryEl = document.getElementById('periodWeightSummary');
+  if (weightRows.length >= 2) {
+    const { line } = buildSparkPath(weightRows, 320, 60);
+    weightSvg.innerHTML = `<path d="${line}" fill="none" stroke="#F18D70" stroke-width="3" stroke-linecap="round"/>`;
+    const first = weightRows[0].weight_kg, last = weightRows[weightRows.length-1].weight_kg;
+    const delta = Math.round((last-first)*10)/10;
+    const daysSpan = Math.max(1, (new Date(weightRows[weightRows.length-1].date) - new Date(weightRows[0].date)) / 86400000);
+    const weeklyRate = Math.round((delta/daysSpan*7)*100)/100;
+    let goalText = '';
+    if (state.goalWeight) {
+      const remaining = Math.round((last - state.goalWeight)*10)/10;
+      goalText = remaining <= 0 ? ' Цель по весу достигнута 🎉' : ` До цели осталось ${remaining} кг.`;
+      if (state.rateKgWeek) goalText += ` План: ~${state.rateKgWeek} кг/нед.`;
+    }
+    weightSummaryEl.textContent = `Изменение за период: ${delta>=0?'+':''}${delta} кг (~${weeklyRate} кг/нед).${goalText}`;
+  } else {
+    weightSvg.innerHTML = '';
+    weightSummaryEl.textContent = 'Недостаточно записей веса за этот период — вноси вес почаще, и здесь появится график.';
+  }
+
+  state.periodSummaryText = buildPeriodSummaryText({ avgConsumed, avgBurned, avgP, avgF, avgC, loggedCount, days, weightRows });
+  document.getElementById('periodRecommendText').style.display = 'none';
+  document.getElementById('periodRecommendText').textContent = '';
+}
+
+document.querySelectorAll('.period-tab').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    document.querySelectorAll('.period-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.periodDays = parseInt(btn.dataset.period, 10);
+    await renderPeriodAnalytics();
+  });
+});
+
+document.getElementById('periodRecommendBtn').addEventListener('click', async () => {
+  const apiKey = getAnthropicKey();
+  if (!apiKey) return;
+  const btn = document.getElementById('periodRecommendBtn');
+  btn.disabled = true; const original = btn.innerHTML; btn.innerHTML = '⏳ анализирую…';
+  const system = `Ты — дружелюбный, но профессиональный нутрициолог-аналитик. На основе сводки за период дай развёрнутые рекомендации (4-6 предложений): оцени баланс питания, соответствие цели, динамику веса, и дай 2-3 конкретных совета на будущее. Пиши на "ты", тепло и по делу, без markdown и воды.`;
+  try {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+      body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 400, system, messages: [{ role: "user", content: state.periodSummaryText }] })
+    });
+    const data = await response.json();
+    const textBlock = (data.content || []).find(b => b.type === 'text');
+    const el = document.getElementById('periodRecommendText');
+    el.textContent = textBlock ? textBlock.text : 'Не удалось получить рекомендации.';
+    el.style.display = 'block';
+  } catch (e) { console.error(e); }
+  finally { btn.disabled = false; btn.innerHTML = original; }
+});
+
 async function renderWeight() {
   const log = await loadWeightLog(10);
   const svg = document.getElementById('weightSpark');
@@ -1229,10 +1409,12 @@ function applyView(view) {
   const water = document.querySelector('.water-card');
   const weightCard = document.getElementById('goals');
   const goalSummary = document.getElementById('goalSummaryCard');
+  const periodCard = document.getElementById('periodAnalyticsCard');
   const contentGrid = document.querySelector('.content-grid');
 
   [hero, balance, diaryS, rightCol, coach, water, weightCard].forEach(el => { el.style.display = ''; });
   goalSummary.style.display = 'none';
+  periodCard.style.display = 'none';
   contentGrid.style.gridTemplateColumns = '';
 
   if (view === 'diary') {
@@ -1241,7 +1423,9 @@ function applyView(view) {
   } else if (view === 'insights') {
     hero.style.display = 'none'; balance.style.display = 'none'; diaryS.style.display = 'none';
     water.style.display = 'none'; weightCard.style.display = 'none';
+    periodCard.style.display = '';
     contentGrid.style.gridTemplateColumns = '1fr';
+    renderPeriodAnalytics();
   } else if (view === 'goals') {
     hero.style.display = 'none'; balance.style.display = 'none'; diaryS.style.display = 'none';
     coach.style.display = 'none';
