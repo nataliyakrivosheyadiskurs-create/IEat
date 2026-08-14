@@ -343,6 +343,23 @@
   .period-recommend-btn:disabled { opacity: 0.5; }
   .period-recommend-text { margin-top: 14px; font-size: 13px; line-height: 1.6; color: var(--ink); background: var(--surface-soft); border-radius: 10px; padding: 12px 14px; }
 
+  /* ---------------- Recipes ---------------- */
+  .auth-field textarea {
+    width: 100%; padding: 11px 14px; border: 1.5px solid var(--line); border-radius: 10px;
+    font-family: inherit; font-size: 14px; background: var(--surface-soft); color: var(--ink); resize: vertical;
+  }
+  .auth-field textarea:focus { outline: none; border-color: var(--coral); }
+  .recipe-modal-card { max-width: 420px; max-height: 88vh; overflow-y: auto; }
+  .recipe-list { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px; }
+  .recipe-list-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--ink-soft); margin-bottom: 10px; }
+  .recipe-list-empty { font-size: 12.5px; color: var(--ink-soft); }
+  .recipe-list-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed var(--line); }
+  .recipe-list-item:last-child { border-bottom: none; }
+  .recipe-list-item b { font-size: 13.5px; display: block; }
+  .recipe-list-item span { font-size: 11.5px; color: var(--ink-soft); }
+  .recipe-del-btn { background: none; border: none; color: var(--ink-faint); font-size: 13px; padding: 4px 6px; }
+  .recipe-del-btn:hover { color: var(--red); }
+
 
   /* ---------------- Mobile ---------------- */
   @media (max-width: 900px) {
@@ -516,11 +533,30 @@
     <button data-fill="на завтрак омлет из 2 яиц и тост">🍳 Омлет и тост на завтрак</button>
     <button data-fill="гуляла быстрым шагом 30 минут">👟 Гуляла 30 минут</button>
     <button id="repeatYesterdayBtn">↻ Как вчера на завтрак</button>
+    <button id="openRecipesBtn">🍳 Мои блюда</button>
   </div>
   <div class="chat-box">
     <button class="plus" aria-label="Добавить">+</button>
     <input id="chatInput" placeholder="Напишите, что вы ели или чем занимались…" />
     <button class="send" id="sendBtn" aria-label="Отправить">↑</button>
+  </div>
+</div>
+
+<!-- RECIPE MODAL -->
+<div class="modal-overlay" id="recipeModal">
+  <div class="modal-card recipe-modal-card">
+    <h3>Мои блюда</h3>
+    <div class="auth-field"><label>Название блюда</label><input id="recipeNameInput" placeholder="напр. Оладушки"></div>
+    <div class="auth-field">
+      <label>Ингредиенты — вся партия целиком</label>
+      <textarea id="recipeIngredientsInput" rows="3" placeholder="150г кукурузы, 30г муки, 1 яйцо, соль, перец, 10г разрыхлителя, 15г оливкового масла"></textarea>
+    </div>
+    <div class="auth-field"><label>Сколько получилось порций/штук</label><input type="number" id="recipeYieldInput" placeholder="напр. 20"></div>
+    <div class="modal-actions">
+      <button class="cancel-btn" id="recipeModalCancel">Закрыть</button>
+      <button class="save-btn" id="recipeModalSave">Рассчитать и сохранить</button>
+    </div>
+    <div class="recipe-list" id="recipeList"></div>
   </div>
 </div>
 
@@ -602,6 +638,7 @@ const state = {
   rateKgWeek: null,
   periodDays: 7,
   periodSummaryText: '',
+  recipes: [],
   userId: null,
   userEmail: null,
   calMonth: new Date().getMonth(),
@@ -744,6 +781,49 @@ async function loadWeightRange(startDate, endDate) {
 async function loadDaysRange(startDate, endDate) {
   const { data, error } = await sb.from('days').select('date, items').eq('user_id', state.userId).gte('date', startDate).lte('date', endDate).order('date', { ascending: true });
   return (!error && data) ? data : [];
+}
+async function loadRecipes() {
+  const { data, error } = await sb.from('recipes').select('*').eq('user_id', state.userId).order('created_at', { ascending: false });
+  state.recipes = (!error && data) ? data : [];
+}
+async function saveRecipe({ name, ingredientsText, yieldCount, batch, per }) {
+  const { error } = await sb.from('recipes').insert({
+    user_id: state.userId, name, ingredients_text: ingredientsText, yield_count: yieldCount,
+    batch_kcal: batch.kcal, batch_protein: batch.protein, batch_fat: batch.fat, batch_carbs: batch.carbs,
+    per_kcal: per.kcal, per_protein: per.protein, per_fat: per.fat, per_carbs: per.carbs
+  });
+  if (error) console.error('save recipe failed', error);
+  await loadRecipes();
+}
+async function deleteRecipe(id) {
+  const { error } = await sb.from('recipes').delete().eq('id', id).eq('user_id', state.userId);
+  if (error) console.error('delete recipe failed', error);
+  await loadRecipes();
+}
+async function computeRecipeBatch(ingredientsText, apiKey) {
+  const system = `Ты — модуль расчёта КБЖУ. Пользователь описывает ВСЮ партию ингредиентов для одного блюда целиком (не на 100г, а именно указанные количества). Посчитай суммарные калории, белки, жиры и углеводы для всей партии сразу. Приправы вроде соли и перца считай пренебрежимо малыми по калорийности (близко к нулю). Ответь СТРОГО в формате JSON без пояснений: {"kcal": число, "protein": число, "fat": число, "carbs": число}`;
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+    body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 300, system, messages: [{ role: "user", content: ingredientsText }] })
+  });
+  const data = await response.json();
+  const textBlock = (data.content || []).find(b => b.type === 'text');
+  let raw = textBlock ? textBlock.text : '{}';
+  raw = raw.replace(/```json|```/g, '').trim();
+  return JSON.parse(raw);
+}
+function renderRecipeList() {
+  const el = document.getElementById('recipeList');
+  if (state.recipes.length === 0) {
+    el.innerHTML = '<p class="recipe-list-empty">Сохранённых блюд пока нет — заполни форму выше.</p>';
+    return;
+  }
+  el.innerHTML = '<p class="recipe-list-title">Сохранённые блюда</p>' + state.recipes.map(r => `
+    <div class="recipe-list-item">
+      <div><b>${r.name}</b><span>${round(r.per_kcal)} ккал / шт · партия на ${r.yield_count} шт</span></div>
+      <button class="recipe-del-btn" data-id="${r.id}">✕</button>
+    </div>`).join('');
 }
 async function saveWeight(dateStr, kg) {
   const { error } = await sb.from('weight_log').upsert({ user_id: state.userId, date: dateStr, weight_kg: kg, updated_at: new Date().toISOString() }, { onConflict: 'user_id,date' });
@@ -941,16 +1021,34 @@ async function deleteMeal(meal) {
 }
 
 /* ---------------- Claude API ---------------- */
+function resolveSingleRecipeUse(it) {
+  const recipe = state.recipes.find(r => r.name.toLowerCase() === (it.recipe_name || '').toLowerCase());
+  if (!recipe) return null;
+  const qty = it.quantity || 1;
+  return {
+    id: 'item_' + Date.now() + '_' + Math.random().toString(36).slice(2,8),
+    kind: 'food',
+    name: `${recipe.name} (${qty} шт)`,
+    meal: it.meal || 'snack',
+    kcal: recipe.per_kcal * qty, protein: recipe.per_protein * qty, fat: recipe.per_fat * qty, carbs: recipe.per_carbs * qty,
+    liquid_ml: 0
+  };
+}
+
 async function parseMessage(text) {
   const apiKey = getAnthropicKey();
   if (!apiKey) return [];
+  const recipeNames = state.recipes.map(r => r.name);
+  const recipeHint = recipeNames.length
+    ? `\n\nУ пользователя есть сохранённые блюда с точно рассчитанным КБЖУ на одну штуку/порцию: ${recipeNames.join(', ')}. Если сообщение упоминает одно из этих блюд по названию с количеством (например "4 оладушка"), верни для него объект {"kind": "recipe_use", "recipe_name": "точное название из списка", "quantity": число_штук_или_порций, "meal": "breakfast|lunch|dinner|snack"} — калории для него считать НЕ нужно, это сделает клиент по сохранённым данным. Используй recipe_use только при точном совпадении названия блюда из списка.`
+    : '';
   const system = `Ты — модуль разбора дневника питания. Разбей сообщение пользователя на отдельные записи: продукты питания (kind: "food") или физическую активность (kind: "activity").
 
 Для еды определи КБЖУ максимально точно, используя свои знания о продуктах (включая известные бренды и магазинные товары, если упомянуты). Определи подходящий приём пищи по контексту (завтрак/обед/ужин/перекус) — если не указано явно, оцени по времени суток или здравому смыслу, по умолчанию "snack".
 
 Если продукт — это напиток или жидкая пища (кофе, чай, вода, сок, молоко, суп, смузи и т.п.), дополнительно укажи поле "liquid_ml" — объём жидкости в миллилитрах, который идёт в счётчик выпитой воды (это ОТДЕЛЬНО от калорий: у кофе с молоком и сахаром есть и калории, и объём жидкости — укажи оба). Для твёрдой еды без заметного объёма жидкости поле "liquid_ml" не указывай или укажи 0.
 
-Для активности рассчитай примерный расход калорий исходя из типа активности, длительности и интенсивности (если вес пользователя неизвестен, используй среднее значение 65кг).
+Для активности рассчитай примерный расход калорий исходя из типа активности, длительности и интенсивности (если вес пользователя неизвестен, используй среднее значение 65кг).${recipeHint}
 
 Ответь СТРОГО в формате JSON без каких-либо пояснений, markdown или преамбулы. Формат:
 {"items": [
@@ -967,9 +1065,18 @@ async function parseMessage(text) {
   let raw = textBlock ? textBlock.text : '{"items":[]}';
   raw = raw.replace(/```json|```/g, '').trim();
   try {
-    const items = JSON.parse(raw).items || [];
-    items.forEach(i => { i.id = 'item_' + Date.now() + '_' + Math.random().toString(36).slice(2,8); });
-    return items;
+    const rawItems = JSON.parse(raw).items || [];
+    const finalItems = [];
+    rawItems.forEach(it => {
+      if (it.kind === 'recipe_use') {
+        const resolved = resolveSingleRecipeUse(it);
+        if (resolved) finalItems.push(resolved);
+      } else {
+        it.id = 'item_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
+        finalItems.push(it);
+      }
+    });
+    return finalItems;
   } catch (e) { console.error('parse error', e, raw); return []; }
 }
 
@@ -1474,6 +1581,44 @@ document.getElementById('repeatYesterdayBtn').addEventListener('click', async ()
   document.getElementById('chatInput').focus();
 });
 
+/* ---------------- Recipe modal wiring ---------------- */
+document.getElementById('openRecipesBtn').addEventListener('click', () => {
+  renderRecipeList();
+  document.getElementById('recipeModal').classList.add('open');
+});
+document.getElementById('recipeModalCancel').addEventListener('click', () => document.getElementById('recipeModal').classList.remove('open'));
+document.getElementById('recipeModalSave').addEventListener('click', async () => {
+  const name = document.getElementById('recipeNameInput').value.trim();
+  const ingredientsText = document.getElementById('recipeIngredientsInput').value.trim();
+  const yieldCount = parseFloat(document.getElementById('recipeYieldInput').value.replace(',', '.'));
+  if (!name || !ingredientsText || !yieldCount) { alert('Заполни название, ингредиенты и количество порций'); return; }
+  const apiKey = getAnthropicKey();
+  if (!apiKey) return;
+  const btn = document.getElementById('recipeModalSave');
+  btn.disabled = true; const original = btn.textContent; btn.textContent = '⏳ считаю…';
+  try {
+    const batch = await computeRecipeBatch(ingredientsText, apiKey);
+    const per = { kcal: batch.kcal / yieldCount, protein: batch.protein / yieldCount, fat: batch.fat / yieldCount, carbs: batch.carbs / yieldCount };
+    await saveRecipe({ name, ingredientsText, yieldCount, batch, per });
+    document.getElementById('recipeNameInput').value = '';
+    document.getElementById('recipeIngredientsInput').value = '';
+    document.getElementById('recipeYieldInput').value = '';
+    renderRecipeList();
+  } catch (e) {
+    console.error(e);
+    alert('Не получилось рассчитать блюдо — попробуй ещё раз или упрости список ингредиентов');
+  } finally {
+    btn.disabled = false; btn.textContent = original;
+  }
+});
+document.getElementById('recipeList').addEventListener('click', async (e) => {
+  const btn = e.target.closest('.recipe-del-btn');
+  if (!btn) return;
+  if (!confirm('Удалить это блюдо из сохранённых?')) return;
+  await deleteRecipe(btn.dataset.id);
+  renderRecipeList();
+});
+
 /* ---------------- Timeline item click delegation ---------------- */
 document.getElementById('timeline').addEventListener('click', async (e) => {
   const moreBtn = e.target.closest('.more');
@@ -1495,6 +1640,7 @@ async function refreshAll() {
 async function init() {
   applyView('dashboard');
   await loadSettings();
+  await loadRecipes();
   renderGoalSummary();
   await renderHero();
   await refreshAll();
