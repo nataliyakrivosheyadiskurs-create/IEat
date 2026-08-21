@@ -8,6 +8,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
   :root {
     --bg: #F7F1EA;
@@ -341,6 +343,35 @@
   .period-recommend-btn { width: 100%; background: var(--coral-light); border: none; color: var(--coral-deep); border-radius: 10px; padding: 11px; font-size: 13px; font-weight: 600; }
   .period-recommend-btn:hover { background: var(--coral); color: #fff; }
   .period-recommend-btn:disabled { opacity: 0.5; }
+  .period-missing { font-size: 12px; color: var(--ink-soft); line-height: 1.6; margin: -8px 0 20px; }
+  .period-missing b { color: var(--red); font-weight: 600; }
+  .period-missing.all-filled { color: var(--green); }
+  .period-pdf-btn {
+    width: 100%; background: var(--surface-soft); border: 1.5px solid var(--line); color: var(--ink);
+    border-radius: 10px; padding: 11px; font-size: 13px; font-weight: 600; margin-top: 10px;
+  }
+  .period-pdf-btn:hover { border-color: var(--coral); color: var(--coral-deep); }
+  .period-pdf-btn:disabled { opacity: 0.5; }
+
+  /* ---------------- PDF report (offscreen render source) ---------------- */
+  #pdfReportContainer {
+    position: fixed; left: -9999px; top: 0; width: 780px; background: #fff; color: #1a1a1a;
+    font-family: Arial, sans-serif; padding: 36px; box-sizing: border-box;
+  }
+  #pdfReportContainer h1 { font-size: 22px; margin: 0 0 4px; color: #2B2420; }
+  #pdfReportContainer .pdf-sub { font-size: 13px; color: #8C8177; margin-bottom: 22px; }
+  #pdfReportContainer .pdf-summary { display: flex; gap: 14px; margin-bottom: 26px; flex-wrap: wrap; }
+  #pdfReportContainer .pdf-summary div { background: #FBF6F0; border-radius: 10px; padding: 10px 16px; min-width: 120px; }
+  #pdfReportContainer .pdf-summary span { display: block; font-size: 10.5px; color: #8C8177; text-transform: uppercase; margin-bottom: 3px; }
+  #pdfReportContainer .pdf-summary b { font-size: 16px; }
+  #pdfReportContainer .pdf-day { margin-bottom: 20px; page-break-inside: avoid; }
+  #pdfReportContainer .pdf-day h2 { font-size: 15px; margin: 0 0 6px; border-bottom: 2px solid #F18D70; padding-bottom: 4px; }
+  #pdfReportContainer .pdf-day-empty { font-size: 12px; color: #8C8177; font-style: italic; }
+  #pdfReportContainer .pdf-meal { font-size: 12px; font-weight: 700; margin: 8px 0 3px; color: #E1704F; }
+  #pdfReportContainer .pdf-item-row { display: flex; justify-content: space-between; font-size: 11.5px; padding: 2px 0; }
+  #pdfReportContainer .pdf-item-row span:first-child { color: #444; }
+  #pdfReportContainer .pdf-item-row span:last-child { color: #8C8177; white-space: nowrap; padding-left: 10px; }
+  #pdfReportContainer .pdf-day-total { font-size: 12px; font-weight: 700; margin-top: 8px; padding-top: 6px; border-top: 1px dashed #ECE3D8; }
   .period-recommend-text { margin-top: 14px; font-size: 13px; line-height: 1.6; color: var(--ink); background: var(--surface-soft); border-radius: 10px; padding: 12px 14px; }
 
   /* ---------------- Recipes ---------------- */
@@ -496,6 +527,7 @@
 
           <p class="chart-label">Калории по дням</p>
           <div class="period-bars" id="periodBars"></div>
+          <div class="period-missing" id="periodMissing"></div>
 
           <p class="chart-label">Динамика веса</p>
           <svg viewBox="0 0 320 70" id="periodWeightChart" class="period-weight-svg"></svg>
@@ -503,6 +535,8 @@
 
           <button class="period-recommend-btn" id="periodRecommendBtn">Получить рекомендации от ИИ <span>→</span></button>
           <div class="period-recommend-text" id="periodRecommendText" style="display:none"></div>
+
+          <button class="period-pdf-btn" id="periodPdfBtn">📄 Скачать PDF-отчёт за период</button>
         </section>
 
         <section class="water-card">
@@ -559,6 +593,9 @@
     <div class="recipe-list" id="recipeList"></div>
   </div>
 </div>
+
+<!-- Offscreen container used to render PDF report before rasterizing -->
+<div id="pdfReportContainer"></div>
 
 <!-- GOALS WIZARD MODAL -->
 <div class="modal-overlay" id="goalsModal">
@@ -1287,10 +1324,122 @@ async function renderPeriodAnalytics() {
     weightSummaryEl.textContent = 'Недостаточно записей веса за этот период — вноси вес почаще, и здесь появится график.';
   }
 
+  const missingEl = document.getElementById('periodMissing');
+  const missingDates = barsData.filter(b => b.consumed === 0 && b.burned === 0).map(b => b.date);
+  if (missingDates.length === 0) {
+    missingEl.className = 'period-missing all-filled';
+    missingEl.textContent = '✓ Записи есть за каждый день периода';
+  } else {
+    missingEl.className = 'period-missing';
+    const formatted = missingDates.map(d => new Date(d+'T00:00:00').toLocaleDateString('ru-RU', { day:'numeric', month:'long' }));
+    missingEl.innerHTML = `<b>Пропущено ${missingDates.length} ${missingDates.length===1?'день':'дней'}:</b> ${formatted.join(', ')}`;
+  }
+
   state.periodSummaryText = buildPeriodSummaryText({ avgConsumed, avgBurned, avgP, avgF, avgC, loggedCount, days, weightRows });
   document.getElementById('periodRecommendText').style.display = 'none';
   document.getElementById('periodRecommendText').textContent = '';
 }
+
+/* ---------------- PDF export ---------------- */
+const PERIOD_LABELS = { 7: 'неделю', 14: '2 недели', 30: 'месяц' };
+
+async function exportPdfReport() {
+  const btn = document.getElementById('periodPdfBtn');
+  btn.disabled = true; const original = btn.textContent; btn.textContent = '⏳ готовлю отчёт…';
+  try {
+    const days = state.periodDays;
+    const todayStr = new Date().toISOString().slice(0,10);
+    const startDate = shiftDate(todayStr, -(days-1));
+    const [daysRows, weightRows] = await Promise.all([loadDaysRange(startDate, todayStr), loadWeightRange(startDate, todayStr)]);
+    const dayMap = {};
+    daysRows.forEach(r => { dayMap[r.date] = r.items || []; });
+    const fullRange = [];
+    for (let i = 0; i < days; i++) fullRange.push(shiftDate(startDate, i));
+
+    let totalConsumed = 0, totalBurned = 0, totalP = 0, totalF = 0, totalC = 0, loggedCount = 0;
+    let daysHtml = '';
+
+    fullRange.slice().reverse().forEach(dateStr => {
+      const items = dayMap[dateStr] || [];
+      const label = new Date(dateStr+'T00:00:00').toLocaleDateString('ru-RU', { weekday:'long', day:'numeric', month:'long' });
+      const labelCap = label.charAt(0).toUpperCase() + label.slice(1);
+      if (items.length === 0) {
+        daysHtml += `<div class="pdf-day"><h2>${labelCap}</h2><div class="pdf-day-empty">Записей нет</div></div>`;
+        return;
+      }
+      const food = items.filter(i => i.kind === 'food');
+      const activity = items.filter(i => i.kind === 'activity');
+      let dayConsumed=0, dayBurned=0, dayP=0, dayF=0, dayC=0;
+      let mealsHtml = '';
+      ['breakfast','lunch','dinner','snack'].forEach(meal => {
+        const mealItems = food.filter(i => i.meal === meal);
+        if (mealItems.length === 0) return;
+        mealsHtml += `<div class="pdf-meal">${MEAL_LABELS[meal]}</div>`;
+        mealItems.forEach(i => {
+          dayConsumed += i.kcal; dayP += i.protein; dayF += i.fat; dayC += i.carbs;
+          mealsHtml += `<div class="pdf-item-row"><span>${i.name}</span><span>${round(i.kcal)} ккал · Б${round(i.protein)}/Ж${round(i.fat)}/У${round(i.carbs)}</span></div>`;
+        });
+      });
+      if (activity.length > 0) {
+        mealsHtml += `<div class="pdf-meal">Активность</div>`;
+        activity.forEach(i => { dayBurned += i.kcal; mealsHtml += `<div class="pdf-item-row"><span>${i.name}</span><span>−${round(i.kcal)} ккал</span></div>`; });
+      }
+      totalConsumed += dayConsumed; totalBurned += dayBurned; totalP += dayP; totalF += dayF; totalC += dayC;
+      if (dayConsumed > 0 || dayBurned > 0) loggedCount++;
+      daysHtml += `<div class="pdf-day"><h2>${labelCap}</h2>${mealsHtml}
+        <div class="pdf-day-total">Потреблено ${round(dayConsumed)} ккал · Сожжено ${round(dayBurned)} ккал · Баланс ${round(dayConsumed-dayBurned)} ккал</div></div>`;
+    });
+
+    let weightSummary = 'Записей веса за период недостаточно для динамики.';
+    if (weightRows.length >= 2) {
+      const first = weightRows[0].weight_kg, last = weightRows[weightRows.length-1].weight_kg;
+      const delta = Math.round((last-first)*10)/10;
+      weightSummary = `Вес изменился с ${first} до ${last} кг (${delta>=0?'+':''}${delta} кг) за период.`;
+    }
+
+    const container = document.getElementById('pdfReportContainer');
+    container.innerHTML = `
+      <h1>Тарелка — отчёт по питанию</h1>
+      <div class="pdf-sub">Период: ${fmtDayLabel(startDate)} — ${fmtDayLabel(todayStr)} (${PERIOD_LABELS[days]||days+' дней'})</div>
+      <div class="pdf-summary">
+        <div><span>Дней с записями</span><b>${loggedCount} из ${days}</b></div>
+        <div><span>Ср. потреблено</span><b>${loggedCount?round(totalConsumed/loggedCount):0} ккал</b></div>
+        <div><span>Ср. сожжено</span><b>${loggedCount?round(totalBurned/loggedCount):0} ккал</b></div>
+        <div><span>Ср. белки</span><b>${loggedCount?round(totalP/loggedCount):0} г</b></div>
+        <div><span>Ср. жиры</span><b>${loggedCount?round(totalF/loggedCount):0} г</b></div>
+        <div><span>Ср. углеводы</span><b>${loggedCount?round(totalC/loggedCount):0} г</b></div>
+      </div>
+      <p style="font-size:12px;color:#8C8177;margin-bottom:24px;">${weightSummary}</p>
+      ${daysHtml}
+    `;
+
+    const canvas = await html2canvas(container, { scale: 2, backgroundColor: '#ffffff' });
+    const imgData = canvas.toDataURL('image/png');
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pageWidth = 210, pageHeight = 297;
+    const imgWidth = pageWidth;
+    const imgHeight = canvas.height * imgWidth / canvas.width;
+    let heightLeft = imgHeight;
+    let position = 0;
+    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+    heightLeft -= pageHeight;
+    while (heightLeft > 0) {
+      position = heightLeft - imgHeight;
+      pdf.addPage();
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+    }
+    pdf.save(`tarelka-otchet-${startDate}-${todayStr}.pdf`);
+    container.innerHTML = '';
+  } catch (e) {
+    console.error(e);
+    alert('Не получилось собрать PDF — попробуй ещё раз.');
+  } finally {
+    btn.disabled = false; btn.textContent = original;
+  }
+}
+document.getElementById('periodPdfBtn').addEventListener('click', exportPdfReport);
 
 document.querySelectorAll('.period-tab').forEach(btn => {
   btn.addEventListener('click', async () => {
